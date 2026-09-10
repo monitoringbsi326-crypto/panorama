@@ -1,386 +1,654 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ION9000 Test</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-<style>
-body {
-  font-family: -apple-system, sans-serif;
-  background: #f5f7fa;
-  margin: 0;
-  padding: 16px;
-  color: #1a202c;
-}
-.box {
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  margin-bottom: 16px;
-}
-h1 { font-size: 18px; margin: 0 0 12px; color: #4CAF50; }
-h2 { font-size: 15px; margin: 0 0 12px; }
-input {
-  width: 100%;
-  padding: 12px;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 15px;
-  margin-bottom: 10px;
-  box-sizing: border-box;
-}
-button {
-  width: 100%;
-  padding: 12px;
-  background: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: bold;
-  cursor: pointer;
-  margin-bottom: 8px;
-}
-button:active { opacity: 0.8; }
-button.sec {
-  background: #3182ce;
-}
-button.ter {
-  background: #ed8936;
-}
-#err { color: red; font-size: 13px; margin-top: 8px; min-height: 18px; }
-#log {
-  background: #1a202c;
-  color: #4CAF50;
-  font-family: monospace;
-  font-size: 11px;
-  padding: 12px;
-  border-radius: 8px;
-  max-height: 200px;
-  overflow: auto;
-  white-space: pre-wrap;
-  margin-bottom: 16px;
-}
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.mini-card {
-  background: white;
-  border-radius: 8px;
-  padding: 10px;
-  border-left: 3px solid #4CAF50;
-  font-size: 12px;
-}
-.mini-card .t {
-  font-size: 10px;
-  color: #718096;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-.mini-card .v {
-  font-size: 16px;
-  font-weight: bold;
-}
-canvas { max-height: 250px; }
-.hidden { display: none; }
-.chip-row {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-  margin-bottom: 10px;
-}
-.chip {
-  padding: 8px 12px;
-  background: #f5f7fa;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  font-size: 12px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.chip.sel {
-  background: #4CAF50;
-  color: white;
-  border-color: #4CAF50;
-}
-.period-row {
-  display: flex;
-  gap: 4px;
-  background: #f5f7fa;
-  padding: 4px;
-  border-radius: 8px;
-  margin-bottom: 12px;
-}
-.period {
-  flex: 1;
-  padding: 8px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: bold;
-  color: #718096;
-  cursor: pointer;
-  margin: 0;
-}
-.period.sel {
-  background: #4CAF50;
-  color: white;
-}
-</style>
-</head>
-<body>
+/**
+ * ============================================================
+ * Multi-Panel Monitoring Backend — Google Apps Script
+ * ============================================================
+ * Mendukung multiple panel (ION9000, panel lain, dll).
+ * Setiap panel punya spreadsheet sendiri, di-rotate per bulan.
+ *
+ * Data dari ESP32 dikirim dengan field "panelId" (mis: "panel1")
+ * Kalau tidak ada panelId, default "panel1".
+ * ============================================================
+ */
 
-<!-- LOGIN -->
-<div id="loginBox" class="box">
-  <h1>⚡ ION9000 Test</h1>
-  <input id="u" placeholder="Username" autocomplete="username">
-  <input id="p" type="password" placeholder="Password" autocomplete="current-password">
-  <button onclick="login()">Login</button>
-  <div id="err"></div>
-</div>
+// ============ KONFIGURASI ============
+const DRIVE_FOLDER_ID = 'GANTI_DENGAN_FOLDER_ID_ANDA';
+const RETENTION_MONTHS = 3;
+const CACHE_SECONDS = 8;
+const TOKEN_EXPIRY_DAYS = 7;
+const DEFAULT_PANEL_ID = 'panel1';
 
-<!-- APP -->
-<div id="app" class="hidden">
-  <div class="box">
-    <h1>⚡ ION9000</h1>
-    <button class="sec" onclick="loadRealtime()">🔄 Refresh Nilai</button>
-    <button class="ter" onclick="loadChart()">📈 Muat Grafik</button>
-    <button onclick="logout()" style="background:#e53e3e;">Logout</button>
-  </div>
-
-  <div id="log">Menunggu...</div>
-
-  <div id="cards" class="card-grid"></div>
-
-  <div class="box">
-    <h2>📈 Grafik</h2>
-    <div class="period-row">
-      <button class="period sel" data-p="1d" onclick="setP('1d')">1 Hari</button>
-      <button class="period" data-p="1w" onclick="setP('1w')">1 Minggu</button>
-      <button class="period" data-p="1m" onclick="setP('1m')">1 Bulan</button>
-    </div>
-    <div id="chips" class="chip-row"></div>
-    <canvas id="chart"></canvas>
-  </div>
-</div>
-
-<script>
-const API_URL = "https://script.google.com/macros/s/AKfycbxAFAVCym991JDn6hsSyCQj0M1dve1r-QtJbdN4s0e2NFic328ULlXGPfRFV04Zow_GKQ/exec";
-
-let token = null;
-let user = null;
-let period = '1d';
-let params = new Set();
-let chartObj = null;
-
-function log(msg) {
-  const el = document.getElementById('log');
-  const time = new Date().toLocaleTimeString();
-  el.textContent = '[' + time + '] ' + msg + '\n' + el.textContent;
-  console.log(msg);
-}
-
-async function login() {
-  const u = document.getElementById('u').value.trim();
-  const p = document.getElementById('p').value;
-  const err = document.getElementById('err');
-
-  err.textContent = '';
-  if (!u || !p) { err.textContent = 'Isi username & password'; return; }
-
-  log('Login: ' + u);
-
-  try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'login', username: u, password: p })
-    });
-    const data = await res.json();
-    log('Login response: ' + JSON.stringify(data));
-
-    if (data.status !== 'success' || !data.token) {
-      err.textContent = data.message || 'Login gagal';
-      return;
-    }
-
-    token = data.token;
-    user = data.user;
-    localStorage.setItem('tk', token);
-    localStorage.setItem('us', user);
-    localStorage.setItem('ex', data.expires);
-
-    document.getElementById('loginBox').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-
-    loadRealtime();
-  } catch (e) {
-    err.textContent = 'Error: ' + e.message;
-    log('Login error: ' + e.message);
-  }
-}
-
-function logout() {
-  localStorage.clear();
-  location.reload();
-}
-
-// Auto-login
-window.onload = function() {
-  const tk = localStorage.getItem('tk');
-  const us = localStorage.getItem('us');
-  const ex = parseInt(localStorage.getItem('ex') || '0');
-  if (tk && us && ex > Date.now()) {
-    token = tk;
-    user = us;
-    document.getElementById('loginBox').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    loadRealtime();
-  }
-  log('Halaman dimuat. Token: ' + (token ? 'ada' : 'tidak ada'));
+// ⚠️ GANTI USERNAME & PASSWORD INI!
+const USERS = {
+  'admin': 'ion9000admin',
+  'operator': 'operator123',
+  'viewer': 'viewer123'
 };
 
-async function apiCall(action, params2) {
-  const url = new URL(API_URL);
-  url.searchParams.set('action', action);
-  url.searchParams.set('token', token);
-  if (params2) {
-    Object.keys(params2).forEach(k => url.searchParams.set(k, params2[k]));
-  }
-  log('GET ' + action + ' ...');
-  const res = await fetch(url.toString());
-  const data = await res.json();
-  log('→ ' + action + ': ' + JSON.stringify(data).substring(0, 150));
-  return data;
-}
+// ============ SCRIPT PROPERTIES ============
+const PROP_TOKENS       = 'auth_tokens';
+const PROP_PANEL_INDEX  = 'panel_index';   // JSON: {panelId: {name, activeMonth, activeSSId, months: [{month,id,name}]}}
 
-async function loadRealtime() {
+// ============ ENTRY POINT: POST ============
+function doPost(e) {
   try {
-    const data = await apiCall('realtime');
-    if (!data.data) {
-      document.getElementById('cards').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:#718096;">Belum ada data</div>';
-      return;
+    if (!e || !e.postData || !e.postData.contents) {
+      return jsonResponse({ status: 'error', message: 'No POST data' });
     }
-    renderCards(data.data);
-  } catch (e) {
-    log('Realtime error: ' + e.message);
+    const body = JSON.parse(e.postData.contents);
+
+    if (body.action === 'login') {
+      return handleLogin(body);
+    }
+
+    // Data sensor — cek panelId
+    const panelId = body.panelId || DEFAULT_PANEL_ID;
+    // Buang panelId dari data sebelum disimpan (biar tidak jadi kolom)
+    const data = Object.assign({}, body);
+    delete data.panelId;
+    delete data.action;
+
+    const result = writeToSheet(panelId, data);
+    return jsonResponse({
+      status: 'success',
+      message: 'Data tersimpan',
+      panelId: panelId,
+      row: result.row,
+      sheet: result.sheetName,
+      timestamp: result.timestamp
+    });
+  } catch (err) {
+    console.error('doPost error:', err);
+    return jsonResponse({ status: 'error', message: err.message });
   }
 }
 
-function renderCards(d) {
-  const container = document.getElementById('cards');
-  let html = '';
-  Object.keys(d).forEach(k => {
-    if (k === 'timestamp') return;
-    let val = d[k];
-    if (typeof val === 'number') val = val.toFixed(2);
-    html += `<div class="mini-card"><div class="t">${k}</div><div class="v">${val}</div></div>`;
-  });
-  container.innerHTML = html;
+// ============ ENTRY POINT: GET ============
+function doGet(e) {
+  try {
+    const action = (e.parameter.action || 'realtime').toLowerCase();
 
-  // Load chips (untuk grafik)
-  const chips = document.getElementById('chips');
-  chips.innerHTML = '';
-  Object.keys(d).forEach(k => {
-    if (k === 'timestamp' || k === 'cb_status') return;
-    const chip = document.createElement('div');
-    chip.className = 'chip';
-    chip.textContent = k;
-    chip.onclick = () => toggleParam(k, chip);
-    chips.appendChild(chip);
-  });
-}
+    if (action === 'health') {
+      return jsonResponse({ status: 'ok', time: new Date().toISOString() });
+    }
 
-function toggleParam(p, el) {
-  if (params.has(p)) {
-    params.delete(p);
-    el.classList.remove('sel');
-  } else {
-    params.add(p);
-    el.classList.add('sel');
+    if (action === 'login') {
+      return handleLogin(e.parameter);
+    }
+
+    const token = e.parameter.token;
+    const user = validateToken(token);
+    if (!user) {
+      return jsonResponse({ status: 'error', message: 'Unauthorized' }, 401);
+    }
+
+    const panelId = e.parameter.panelId || DEFAULT_PANEL_ID;
+
+    switch (action) {
+      case 'realtime':      return jsonResponse(getRealtime(panelId));
+      case 'latest':        return jsonResponse(getLatest(panelId, parseInt(e.parameter.limit) || 100));
+      case 'history':       return jsonResponse(getHistory(panelId, e.parameter.date));
+      case 'months':        return jsonResponse(getAvailableMonths(panelId));
+      case 'daily_summary': return jsonResponse(getDailySummary(panelId, e.parameter.date));
+      case 'chart':         return jsonResponse(getChartData(panelId, e.parameter.period, e.parameter.param, e.parameter.date));
+      case 'cb_timeline':   return jsonResponse(getCbTimeline(panelId, e.parameter.period, e.parameter.date));
+      case 'panels':        return jsonResponse(listPanels());
+      case 'check':         return jsonResponse({ status: 'success', user: user });
+      default:              return jsonResponse({ status: 'error', message: 'Unknown action' });
+    }
+  } catch (err) {
+    console.error('doGet error:', err);
+    return jsonResponse({ status: 'error', message: err.message }, 500);
   }
 }
 
-function setP(p) {
-  period = p;
-  document.querySelectorAll('.period').forEach(b => {
-    b.classList.toggle('sel', b.dataset.p === p);
+// ============ LOGIN ============
+function handleLogin(params) {
+  const username = params.username;
+  const password = params.password;
+
+  if (!username || !password) {
+    return jsonResponse({ status: 'error', message: 'Username & password wajib diisi' });
+  }
+
+  if (!USERS[username] || USERS[username] !== password) {
+    Utilities.sleep(500);
+    return jsonResponse({ status: 'error', message: 'Username atau password salah' });
+  }
+
+  const token = generateToken();
+  const expires = Date.now() + (TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
+  const props = PropertiesService.getScriptProperties();
+  let tokens = {};
+  try { tokens = JSON.parse(props.getProperty(PROP_TOKENS) || '{}'); } catch (e) { tokens = {}; }
+
+  const now = Date.now();
+  Object.keys(tokens).forEach(t => {
+    if (tokens[t].expires < now) delete tokens[t];
+  });
+
+  tokens[token] = { user: username, expires: expires };
+  props.setProperty(PROP_TOKENS, JSON.stringify(tokens));
+
+  return jsonResponse({
+    status: 'success',
+    token: token,
+    user: username,
+    expires: expires
   });
 }
 
-async function loadChart() {
-  if (params.size === 0) {
-    log('Pilih parameter dulu!');
-    alert('Pilih minimal 1 parameter dulu');
-    return;
+function generateToken() {
+  const bytes = [];
+  for (let i = 0; i < 32; i++) bytes.push(Math.floor(Math.random() * 256));
+  return Utilities.base64EncodeWebSafe(bytes);
+}
+
+function validateToken(token) {
+  if (!token) return null;
+  const props = PropertiesService.getScriptProperties();
+  let tokens = {};
+  try { tokens = JSON.parse(props.getProperty(PROP_TOKENS) || '{}'); } catch (e) { return null; }
+
+  const entry = tokens[token];
+  if (!entry) return null;
+  if (entry.expires < Date.now()) {
+    delete tokens[token];
+    props.setProperty(PROP_TOKENS, JSON.stringify(tokens));
+    return null;
   }
+  return { username: entry.user };
+}
 
-  log('Load chart: period=' + period + ', params=' + Array.from(params).join(','));
+// ============ PANEL INDEX MANAGEMENT ============
+function getPanelIndex() {
+  const props = PropertiesService.getScriptProperties();
+  try {
+    return JSON.parse(props.getProperty(PROP_PANEL_INDEX) || '{}');
+  } catch (e) { return {}; }
+}
 
-  const datasets = [];
-  const colors = ['#4CAF50', '#3182ce', '#ed8936', '#e53e3e', '#805ad5'];
-  let i = 0;
+function savePanelIndex(index) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(PROP_PANEL_INDEX, JSON.stringify(index));
+}
 
-  for (const p of params) {
+function ensurePanel(panelId) {
+  const index = getPanelIndex();
+  if (!index[panelId]) {
+    index[panelId] = {
+      name: panelId.charAt(0).toUpperCase() + panelId.slice(1),
+      activeMonth: null,
+      activeSSId: null,
+      months: []
+    };
+    savePanelIndex(index);
+  }
+  return index[panelId];
+}
+
+function listPanels() {
+  const index = getPanelIndex();
+  const panels = Object.keys(index).map(id => ({
+    id: id,
+    name: index[id].name,
+    activeMonth: index[id].activeMonth,
+    monthsCount: (index[id].months || []).length
+  }));
+  return { status: 'success', data: panels };
+}
+
+// ============ TULIS DATA ============
+function writeToSheet(panelId, data) {
+  const now = new Date();
+  const monthKey = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyy-MM');
+  const timestamp = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyy-MM-dd HH:mm:ss');
+
+  const ss = getOrCreateMonthlySpreadsheet(panelId, monthKey);
+  const sheet = ss.getSheetByName('Data') || ss.insertSheet('Data');
+  const headers = getOrCreateHeaders(sheet, data);
+
+  const row = headers.map(h => {
+    if (h === 'timestamp') return timestamp;
+    return data[h] !== undefined && data[h] !== null ? data[h] : '';
+  });
+
+  sheet.appendRow(row);
+  cleanupOldSpreadsheets(panelId);
+
+  return { row: sheet.getLastRow(), sheetName: ss.getName(), timestamp: timestamp };
+}
+
+function getOrCreateHeaders(sheet, data) {
+  if (sheet.getLastRow() === 0) {
+    const headers = ['timestamp'].concat(Object.keys(data));
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length)
+      .setFontWeight('bold')
+      .setBackground('#4CAF50')
+      .setFontColor('#FFFFFF');
+    sheet.setFrozenRows(1);
+    return headers;
+  }
+  return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+}
+
+// ============ SPREADSHEET BULANAN (per panel) ============
+function getOrCreateMonthlySpreadsheet(panelId, monthKey) {
+  const index = getPanelIndex();
+  const panel = index[panelId];
+
+  if (panel && panel.activeMonth === monthKey && panel.activeSSId) {
     try {
-      const data = await apiCall('chart', { period: period, param: p });
-
-      if (data.status === 'success' && data.data && data.data.length > 0) {
-        datasets.push({
-          label: p,
-          data: data.data.map(d => ({ x: d.t, y: d.avg })),
-          borderColor: colors[i % colors.length],
-          borderWidth: 2,
-          tension: 0.3,
-          pointRadius: 0,
-          spanGaps: true
-        });
-        log('  ' + p + ': ' + data.data.length + ' titik (raw: ' + (data.meta ? data.meta.totalRaw : '?') + ')');
-        i++;
-      } else {
-        log('  ' + p + ': tidak ada data');
-      }
-    } catch (e) {
-      log('  ' + p + ' error: ' + e.message);
+      return SpreadsheetApp.openById(panel.activeSSId);
+    } catch (err) {
+      console.warn('Active spreadsheet not found: ' + err.message);
     }
   }
 
-  if (chartObj) chartObj.destroy();
+  const ssName = 'Monitor_' + panelId + '_' + monthKey;
+  const ss = SpreadsheetApp.create(ssName);
 
-  if (datasets.length === 0) {
-    alert('Tidak ada data untuk parameter/periode ini');
-    return;
+  if (DRIVE_FOLDER_ID && DRIVE_FOLDER_ID !== 'GANTI_DENGAN_FOLDER_ID_ANDA') {
+    try {
+      const file = DriveApp.getFileById(ss.getId());
+      const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+      folder.addFile(file);
+      DriveApp.getRootFolder().removeFile(file);
+    } catch (err) {
+      console.warn('Cannot move to folder: ' + err.message);
+    }
   }
 
-  const ctx = document.getElementById('chart').getContext('2d');
-  chartObj = new Chart(ctx, {
-    type: 'line',
-    data: { datasets: datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } } },
-      scales: {
-        x: {
-          type: 'time',
-          time: { displayFormats: { hour: 'HH:mm', day: 'dd/MM' } },
-          ticks: { maxTicksLimit: 5, font: { size: 10 } }
-        },
-        y: { ticks: { maxTicksLimit: 5, font: { size: 10 } } }
-      }
+  ss.getSheets()[0].setName('Data');
+
+  // Update index
+  const idx = getPanelIndex();
+  if (!idx[panelId]) {
+    idx[panelId] = { name: panelId, activeMonth: null, activeSSId: null, months: [] };
+  }
+  idx[panelId].activeMonth = monthKey;
+  idx[panelId].activeSSId = ss.getId();
+  idx[panelId].months = (idx[panelId].months || []).filter(m => m.month !== monthKey);
+  idx[panelId].months.push({ month: monthKey, id: ss.getId(), name: ssName });
+  idx[panelId].months.sort((a, b) => b.month.localeCompare(a.month));
+
+  savePanelIndex(idx);
+  return ss;
+}
+
+// ============ RETENSI (per panel) ============
+function cleanupOldSpreadsheets(panelId) {
+  const idx = getPanelIndex();
+  const panel = idx[panelId];
+  if (!panel || !panel.months || panel.months.length <= RETENTION_MONTHS) return;
+
+  panel.months.sort((a, b) => b.month.localeCompare(a.month));
+  const toKeep = panel.months.slice(0, RETENTION_MONTHS);
+  const toDelete = panel.months.slice(RETENTION_MONTHS);
+
+  toDelete.forEach(item => {
+    try {
+      DriveApp.getFileById(item.id).setTrashed(true);
+      console.log('Trashed: ' + item.name);
+    } catch (err) {
+      console.warn('Cannot trash ' + item.name + ': ' + err.message);
+    }
+  });
+  panel.months = toKeep;
+  savePanelIndex(idx);
+}
+
+// ============ HELPER: BUKA SHEET PANEL ============
+function getPanelSheet(panelId, monthKey) {
+  const idx = getPanelIndex();
+  const panel = idx[panelId];
+  if (!panel) return null;
+
+  let entry;
+  if (monthKey) {
+    entry = (panel.months || []).find(m => m.month === monthKey);
+  } else {
+    entry = (panel.months || []).find(m => m.month === panel.activeMonth);
+  }
+  if (!entry) return null;
+
+  try {
+    const ss = SpreadsheetApp.openById(entry.id);
+    return { ss: ss, sheet: ss.getSheetByName('Data'), entry: entry };
+  } catch (err) {
+    return null;
+  }
+}
+
+// ============ API: REALTIME ============
+function getRealtime(panelId) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'realtime_' + panelId;
+  const cached = cache.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+
+  const info = getPanelSheet(panelId);
+  if (!info || !info.sheet || info.sheet.getLastRow() < 2) {
+    return { status: 'success', data: null, panelId: panelId };
+  }
+
+  const sheet = info.sheet;
+  const lastRow = sheet.getLastRow();
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const values = sheet.getRange(lastRow, 1, 1, headers.length).getValues()[0];
+
+  const obj = {};
+  headers.forEach((h, i) => obj[h] = values[i]);
+
+  const result = { status: 'success', data: obj, panelId: panelId };
+  cache.put(cacheKey, JSON.stringify(result), CACHE_SECONDS);
+  return result;
+}
+
+// ============ API: LATEST ============
+function getLatest(panelId, limit) {
+  const info = getPanelSheet(panelId);
+  if (!info || !info.sheet || info.sheet.getLastRow() < 2) {
+    return { status: 'success', data: [], panelId: panelId };
+  }
+
+  const sheet = info.sheet;
+  const lastRow = sheet.getLastRow();
+  const startRow = Math.max(2, lastRow - limit + 1);
+  const numRows = lastRow - startRow + 1;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const values = sheet.getRange(startRow, 1, numRows, headers.length).getValues();
+
+  const data = values.map(row => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = row[i]);
+    return obj;
+  });
+  return { status: 'success', data: data, panelId: panelId };
+}
+
+// ============ API: HISTORY ============
+function getHistory(panelId, dateStr) {
+  if (!dateStr) return { status: 'error', message: 'date required' };
+  const monthKey = dateStr.substring(0, 7);
+  const info = getPanelSheet(panelId, monthKey);
+  if (!info || !info.sheet || info.sheet.getLastRow() < 2) {
+    return { status: 'success', data: [], panelId: panelId };
+  }
+
+  const sheet = info.sheet;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const allValues = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues();
+
+  const filtered = allValues.filter(row => String(row[0]).startsWith(dateStr));
+  const data = filtered.map(row => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = row[i]);
+    return obj;
+  });
+  return { status: 'success', data: data, count: data.length, panelId: panelId };
+}
+
+// ============ API: MONTHS ============
+function getAvailableMonths(panelId) {
+  const idx = getPanelIndex();
+  const panel = idx[panelId];
+  return { status: 'success', data: (panel && panel.months) || [], panelId: panelId };
+}
+
+// ============ API: DAILY SUMMARY ============
+function getDailySummary(panelId, dateStr) {
+  const hist = getHistory(panelId, dateStr);
+  if (!hist.data || hist.data.length === 0) {
+    return { status: 'success', data: null, panelId: panelId };
+  }
+  const rows = hist.data;
+  const numericKeys = Object.keys(rows[0]).filter(k => k !== 'timestamp' && k !== 'cb_status');
+  const summary = {};
+  numericKeys.forEach(key => {
+    const nums = rows.map(r => parseFloat(r[key])).filter(n => !isNaN(n));
+    if (nums.length === 0) return;
+    summary[key] = {
+      min: Math.min.apply(null, nums),
+      max: Math.max.apply(null, nums),
+      avg: nums.reduce((a, b) => a + b, 0) / nums.length
+    };
+  });
+  return { status: 'success', data: summary, count: rows.length, panelId: panelId };
+}
+
+// ============ API: CHART DATA ============
+function getChartData(panelId, period, param, dateStr) {
+  if (!period || !param) {
+    return { status: 'error', message: 'period & param required' };
+  }
+  if (!dateStr) {
+    dateStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
+  }
+
+  const endDate = new Date(dateStr + 'T23:59:59+07:00');
+  let startDate = new Date(endDate);
+  let bucketMinutes = 5;
+
+  if (period === '1d') {
+    startDate.setDate(startDate.getDate() - 1);
+    bucketMinutes = 5;
+  } else if (period === '1w') {
+    startDate.setDate(startDate.getDate() - 7);
+    bucketMinutes = 60;
+  } else if (period === '1m') {
+    startDate.setDate(startDate.getDate() - 30);
+    bucketMinutes = 180;
+  } else {
+    return { status: 'error', message: 'period harus 1d, 1w, atau 1m' };
+  }
+
+  const startMonth = Utilities.formatDate(startDate, 'Asia/Jakarta', 'yyyy-MM');
+  const endMonth = Utilities.formatDate(endDate, 'Asia/Jakarta', 'yyyy-MM');
+
+  const idx = getPanelIndex();
+  const panel = idx[panelId];
+  if (!panel || !panel.months) return { status: 'success', data: [], panelId: panelId };
+
+  const months = panel.months
+    .filter(m => m.month >= startMonth && m.month <= endMonth)
+    .map(m => m.month);
+
+  const allRows = [];
+  months.forEach(m => {
+    const info = getPanelSheet(panelId, m);
+    if (!info || !info.sheet) return;
+
+    try {
+      const sheet = info.sheet;
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const tsIdx = headers.indexOf('timestamp');
+      const paramIdx = headers.indexOf(param);
+      if (tsIdx === -1 || paramIdx === -1) return;
+
+      const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues();
+      values.forEach(row => {
+        const ts = new Date(String(row[tsIdx]).replace(' ', 'T') + '+07:00');
+        if (isNaN(ts.getTime())) return;
+        if (ts < startDate || ts > endDate) return;
+        const val = parseFloat(row[paramIdx]);
+        if (isNaN(val)) return;
+        allRows.push({ ts: ts.getTime(), val: val });
+      });
+    } catch (err) {
+      console.warn('Skip ' + m + ': ' + err.message);
     }
   });
 
-  log('✅ Chart rendered: ' + datasets.length + ' dataset');
+  allRows.sort((a, b) => a.ts - b.ts);
+
+  const bucketMs = bucketMinutes * 60 * 1000;
+  const buckets = {};
+  allRows.forEach(r => {
+    const key = Math.floor(r.ts / bucketMs) * bucketMs;
+    if (!buckets[key]) buckets[key] = [];
+    buckets[key].push(r.val);
+  });
+
+  const data = Object.keys(buckets).sort().map(key => {
+    const vals = buckets[key];
+    return {
+      t: parseInt(key),
+      avg: vals.reduce((a, b) => a + b, 0) / vals.length,
+      min: Math.min.apply(null, vals),
+      max: Math.max.apply(null, vals),
+      count: vals.length
+    };
+  });
+
+  return {
+    status: 'success',
+    data: data,
+    panelId: panelId,
+    meta: {
+      period: period, param: param,
+      start: startDate.toISOString(),
+      end: endDate.toISOString(),
+      bucketMinutes: bucketMinutes,
+      totalRaw: allRows.length,
+      totalBuckets: data.length
+    }
+  };
 }
-</script>
-</body>
-</html>
+
+// ============ API: CB TIMELINE ============
+function getCbTimeline(panelId, period, dateStr) {
+  if (!period) period = '1d';
+  if (!dateStr) {
+    dateStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
+  }
+
+  const endDate = new Date(dateStr + 'T23:59:59+07:00');
+  let startDate = new Date(endDate);
+
+  if (period === '1d') {
+    startDate.setDate(startDate.getDate() - 1);
+  } else if (period === '1w') {
+    startDate.setDate(startDate.getDate() - 7);
+  } else if (period === '1m') {
+    startDate.setDate(startDate.getDate() - 30);
+  }
+
+  const startMonth = Utilities.formatDate(startDate, 'Asia/Jakarta', 'yyyy-MM');
+  const endMonth = Utilities.formatDate(endDate, 'Asia/Jakarta', 'yyyy-MM');
+
+  const idx = getPanelIndex();
+  const panel = idx[panelId];
+  if (!panel || !panel.months) {
+    return { status: 'success', data: [], stats: {}, panelId: panelId };
+  }
+
+  const months = panel.months
+    .filter(m => m.month >= startMonth && m.month <= endMonth)
+    .map(m => m.month);
+
+  const timeline = [];
+
+  months.forEach(m => {
+    const info = getPanelSheet(panelId, m);
+    if (!info || !info.sheet) return;
+
+    try {
+      const sheet = info.sheet;
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const tsIdx = headers.indexOf('timestamp');
+      const cbIdx = headers.indexOf('cb_status');
+      if (tsIdx === -1 || cbIdx === -1) return;
+
+      const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues();
+      values.forEach(row => {
+        const ts = new Date(String(row[tsIdx]).replace(' ', 'T') + '+07:00');
+        if (isNaN(ts.getTime())) return;
+        if (ts < startDate || ts > endDate) return;
+        const status = parseInt(row[cbIdx]);
+        if (isNaN(status)) return;
+        timeline.push({ t: ts.getTime(), s: status });
+      });
+    } catch (err) {
+      console.warn('Skip ' + m + ': ' + err.message);
+    }
+  });
+
+  timeline.sort((a, b) => a.t - b.t);
+
+  let tripCount = 0;
+  let tripDurationMs = 0;
+  let lastTripStart = null;
+  let prevStatus = null;
+
+  timeline.forEach(point => {
+    if (point.s === 0 && prevStatus !== 0) {
+      tripCount++;
+      lastTripStart = point.t;
+    } else if (point.s === 1 && prevStatus === 0 && lastTripStart !== null) {
+      tripDurationMs += (point.t - lastTripStart);
+      lastTripStart = null;
+    }
+    prevStatus = point.s;
+  });
+
+  if (lastTripStart !== null && timeline.length > 0) {
+    tripDurationMs += (timeline[timeline.length - 1].t - lastTripStart);
+  }
+
+  return {
+    status: 'success',
+    data: timeline,
+    panelId: panelId,
+    stats: {
+      tripCount: tripCount,
+      tripDurationMs: tripDurationMs,
+      tripDurationMin: Math.round(tripDurationMs / 60000),
+      totalPoints: timeline.length
+    },
+    meta: {
+      period: period,
+      start: startDate.toISOString(),
+      end: endDate.toISOString()
+    }
+  };
+}
+
+// ============ UTIL ============
+function jsonResponse(obj, code) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ============ TEST ============
+function testWrite() {
+  const sample = {
+    "Current A": 12.34, "Current B": 11.23, "Current C": 10.56,
+    "Voltage A-B": 380.50, "Voltage B-C": 379.80, "Voltage C-A": 381.20,
+    "Active Power Total": 7500.25, "Frequency": 50.01,
+    "daily_usage_kwh": 45.67, "cb_status": 1
+  };
+  const result = writeToSheet('panel1', sample);
+  console.log('Test write panel1:', result);
+}
+
+function testWritePanel2() {
+  const sample = {
+    "Current A": 8.5, "Current B": 8.2, "Current C": 8.1,
+    "Voltage A-B": 379.0, "Active Power Total": 5000,
+    "daily_usage_kwh": 30.5, "cb_status": 1
+  };
+  const result = writeToSheet('panel2', sample);
+  console.log('Test write panel2:', result);
+}
+
+function testLogin() {
+  const result = handleLogin({ username: 'admin', password: 'ion9000admin' });
+  console.log('Test login:', result.getContent());
+}
+
+function testListPanels() {
+  console.log('Panels:', JSON.stringify(listPanels(), null, 2));
+}
