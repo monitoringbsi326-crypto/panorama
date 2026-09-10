@@ -1,0 +1,695 @@
+<script>
+/* ============ KONFIG ============ */
+const API_URL = "https://script.google.com/macros/s/AKfycbxAFAVCym991JDn6hsSyCQj0M1dve1r-QtJbdN4s0e2NFic328ULlXGPfRFV04Zow_GKQ/exec";
+const REFRESH_INTERVAL_MS = 15000;
+const CB_REFRESH_INTERVAL_MS = 60000;
+
+/* ============ STATE ============ */
+let authToken = null;
+let currentUser = null;
+let refreshTimer = null;
+let historyChart = null;
+let cbChart = null;
+let currentPeriod = '1d';
+let selectedParams = new Set();
+let historyData = [];
+let lastCbRefresh = 0;
+
+const COLORS = [
+  '#4CAF50', '#3182ce', '#ed8936', '#e53e3e', '#805ad5',
+  '#38b2ac', '#d69e2e', '#dd6b20', '#319795', '#b83280'
+];
+
+/* ============ LOGIN ============ */
+async function doLogin() {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+
+  errEl.textContent = '';
+  if (!username || !password) { errEl.textContent = 'Isi username & password'; return; }
+
+  btn.disabled = true; btn.textContent = 'Memproses...';
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'login', username, password })
+    });
+    const result = await res.json();
+
+    if (result.status !== 'success' || !result.token) {
+      errEl.textContent = result.message || 'Login gagal';
+      btn.disabled = false; btn.textContent = 'Masuk';
+      return;
+    }
+
+    authToken = result.token;
+    currentUser = result.user;
+    localStorage.setItem('auth_token', authToken);
+    localStorage.setItem('auth_user', currentUser);
+    localStorage.setItem('auth_expires', result.expires);
+    showApp();
+  } catch (err) {
+    errEl.textContent = 'Error: ' + err.message;
+    btn.disabled = false; btn.textContent = 'Masuk';
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !document.getElementById('loginScreen').classList.contains('hidden')) doLogin();
+});
+
+function showApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  initApp();
+}
+
+function logout() {
+  if (!confirm('Yakin logout?')) return;
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_user');
+  localStorage.removeItem('auth_expires');
+  if (refreshTimer) clearInterval(refreshTimer);
+  location.reload();
+}
+
+window.addEventListener('load', () => {
+  const token = localStorage.getItem('auth_token');
+  const user = localStorage.getItem('auth_user');
+  const expires = parseInt(localStorage.getItem('auth_expires') || '0');
+  if (token && user && expires > Date.now()) {
+    authToken = token; currentUser = user; showApp();
+  } else {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('auth_expires');
+  }
+});
+
+/* ============ INIT ============ */
+function initApp() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('historyDate').value = today;
+  document.getElementById('summaryDate').value = today;
+
+  loadRealtime();
+  loadParamChips();
+  loadCbTimeline();
+  lastCbRefresh = Date.now();
+
+  refreshTimer = setInterval(() => {
+    if (document.querySelector('.tab-content.active').id === 'tab-monitoring') {
+      loadRealtime();
+      if (Date.now() - lastCbRefresh > CB_REFRESH_INTERVAL_MS) {
+        lastCbRefresh = Date.now();
+        loadCbTimeline();
+      }
+    }
+  }, REFRESH_INTERVAL_MS);
+
+  initSwipe();
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.nav-btn').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  if (name === 'monitoring') {
+    loadRealtime();
+    if (Date.now() - lastCbRefresh > CB_REFRESH_INTERVAL_MS) {
+      lastCbRefresh = Date.now();
+      loadCbTimeline();
+    }
+  }
+}
+
+/* ============ SWIPE ============ */
+function initSwipe() {
+  const tabs = ['monitoring', 'sample', 'history', 'summary'];
+  let touchStartX = 0, touchStartY = 0, touchStartTime = 0, touchTarget = null;
+
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchStartTime = Date.now();
+    touchTarget = e.target;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (!touchTarget) return;
+    if (touchTarget.closest('input, textarea, select, button, .chip, .period-btn, .table-wrap, .param-chips')) {
+      touchTarget = null; return;
+    }
+
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    const dt = Date.now() - touchStartTime;
+
+    if (Math.abs(dx) < 80 || Math.abs(dy) > Math.abs(dx) || dt > 500) {
+      touchTarget = null; return;
+    }
+
+    const currentTab = document.querySelector('.tab-content.active').id.replace('tab-', '');
+    const idx = tabs.indexOf(currentTab);
+    if (idx === -1) { touchTarget = null; return; }
+
+    if (dx < 0 && idx < tabs.length - 1) switchTab(tabs[idx + 1]);
+    else if (dx > 0 && idx > 0) switchTab(tabs[idx - 1]);
+
+    touchTarget = null;
+  }, { passive: true });
+}
+
+/* ============ API ============ */
+async function apiCall(action, params = {}) {
+  const url = new URL(API_URL);
+  url.searchParams.set('action', action);
+  url.searchParams.set('token', authToken);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+
+  const res = await fetch(url.toString());
+  if (res.status === 401) {
+    showToast('Sesi habis, login ulang');
+    setTimeout(logout, 1500);
+    throw new Error('Unauthorized');
+  }
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return await res.json();
+}
+
+/* ============ REALTIME ============ */
+async function loadRealtime() {
+  try {
+    const result = await apiCall('realtime');
+    document.getElementById('statusDot').classList.add('online');
+    if (!result.data) {
+      document.getElementById('cardsGrid').innerHTML = '<div class="loading" style="grid-column:1/-1;">Belum ada data</div>';
+      return;
+    }
+    renderCards(result.data);
+    checkCBAlert(result.data.cb_status);
+  } catch (err) {
+    document.getElementById('statusDot').classList.remove('online');
+  }
+}
+
+function renderCards(data) {
+  const grid = document.getElementById('cardsGrid');
+  const cbStatus = parseInt(data.cb_status);
+  const units = getUnits();
+  let html = `
+    <div class="status-cb-card ${cbStatus === 0 ? 'trip' : ''}">
+      <div>
+        <div class="cb-label">Status CB</div>
+        <div class="cb-text">${cbStatus === 0 ? 'TRIP' : 'NORMAL'}</div>
+      </div>
+      <div class="cb-icon">${cbStatus === 0 ? '⚠️' : '✅'}</div>
+    </div>
+  `;
+
+  if (data.daily_usage_kwh !== undefined) {
+    html += `
+      <div class="card">
+        <div class="card-title">Daya Hari Ini</div>
+        <div class="card-value">${formatNumber(data.daily_usage_kwh)}<span class="card-unit">kWh</span></div>
+      </div>
+    `;
+  }
+
+  Object.keys(data).forEach(key => {
+    if (key === 'timestamp' || key === 'cb_status' || key === 'daily_usage_kwh') return;
+    const value = data[key];
+    const unit = units[key] || '';
+    html += `
+      <div class="card">
+        <div class="card-title" title="${key}">${key}</div>
+        <div class="card-value">${formatNumber(value)}<span class="card-unit">${unit}</span></div>
+      </div>
+    `;
+  });
+
+  grid.innerHTML = html;
+}
+
+function checkCBAlert(cbStatus) {
+  const banner = document.getElementById('alertBanner');
+  if (parseInt(cbStatus) === 0) {
+    banner.classList.add('show');
+    document.getElementById('alertText').textContent = 'CB TRIP! Periksa panel.';
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+/* ============ PARAM CHIPS ============ */
+async function loadParamChips() {
+  try {
+    const result = await apiCall('realtime');
+    if (!result.data) return;
+    const container = document.getElementById('paramChips');
+    container.innerHTML = '';
+    Object.keys(result.data).forEach(key => {
+      if (key === 'timestamp' || key === 'cb_status') return;
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.textContent = key;
+      chip.dataset.param = key;
+      chip.onclick = () => toggleParam(key);
+      container.appendChild(chip);
+    });
+  } catch (err) {}
+}
+
+function toggleParam(param) {
+  if (selectedParams.has(param)) {
+    selectedParams.delete(param);
+  } else {
+    if (selectedParams.size >= 4) { showToast('Maksimal 4 parameter'); return; }
+    selectedParams.add(param);
+  }
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.classList.toggle('selected', selectedParams.has(chip.dataset.param));
+  });
+
+  // Setiap kali pilih param, langsung load grafik
+  if (selectedParams.size > 0) loadHistoryChart();
+  else if (historyChart) { historyChart.destroy(); historyChart = null; }
+}
+
+/* ============ PERIOD ============ */
+function setPeriod(period) {
+  currentPeriod = period;
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.period === period);
+  });
+  if (selectedParams.size > 0) loadHistoryChart();
+  loadCbTimeline();
+  lastCbRefresh = Date.now();
+}
+
+/* ============ CHART PARAMETER ============ */
+async function loadHistoryChart() {
+  if (selectedParams.size === 0) return;
+
+  const ctx = document.getElementById('historyChart').getContext('2d');
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const textColor = isDark ? '#f7fafc' : '#1a202c';
+  const gridColor = isDark ? '#2d3748' : '#e2e8f0';
+
+  document.getElementById('chartInfo').textContent = 'Memuat...';
+
+  const datasets = [];
+  let i = 0;
+  let totalPoints = 0;
+  let debugInfo = [];
+
+  for (const param of selectedParams) {
+    try {
+      const result = await apiCall('chart', { period: currentPeriod, param: param });
+      
+      if (result.status === 'success' && result.data && result.data.length > 0) {
+        datasets.push({
+          label: param,
+          data: result.data.map(d => ({ x: d.t, y: d.avg })),
+          borderColor: COLORS[i % COLORS.length],
+          backgroundColor: COLORS[i % COLORS.length] + '20',
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          fill: false,
+          spanGaps: true
+        });
+        totalPoints += result.data.length;
+        debugInfo.push(`${param}: ${result.data.length} titik`);
+        i++;
+      } else {
+        debugInfo.push(`${param}: 0 titik (raw: ${result.meta ? result.meta.totalRaw : '?'})`);
+      }
+    } catch (err) {
+      debugInfo.push(`${param}: error - ${err.message}`);
+    }
+  }
+
+  if (historyChart) historyChart.destroy();
+
+  if (datasets.length === 0) {
+    document.getElementById('chartInfo').innerHTML = 
+      `<span style="color:var(--warning);">⚠️ Tidak ada data. ${debugInfo.join(' | ')}</span>`;
+    return;
+  }
+
+  historyChart = new Chart(ctx, {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      animation: { duration: 200 },
+      plugins: {
+        legend: {
+          labels: { color: textColor, boxWidth: 10, font: { size: 10 }, padding: 8, usePointStyle: true }
+        },
+        tooltip: {
+          titleFont: { size: 11 }, bodyFont: { size: 11 },
+          callbacks: {
+            title: (items) => {
+              const d = new Date(items[0].parsed.x);
+              return d.toLocaleString('id-ID', {
+                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+              });
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            displayFormats: { second: 'HH:mm', minute: 'HH:mm', hour: 'HH:mm', day: 'dd/MM', week: 'dd/MM', month: 'MMM' }
+          },
+          ticks: { color: textColor, maxTicksLimit: 5, font: { size: 10 } },
+          grid: { color: gridColor, drawBorder: false }
+        },
+        y: {
+          ticks: { color: textColor, maxTicksLimit: 5, font: { size: 10 } },
+          grid: { color: gridColor, drawBorder: false }
+        }
+      }
+    }
+  });
+
+  const periodLabel = currentPeriod === '1d' ? '1 Hari' : currentPeriod === '1w' ? '1 Minggu' : '1 Bulan';
+  document.getElementById('chartInfo').innerHTML = `
+    <span>📊 ${periodLabel} • ${totalPoints} titik</span>
+    <span style="color:var(--primary);">✅ OK</span>
+  `;
+}
+
+/* ============ CB TIMELINE ============ */
+async function loadCbTimeline() {
+  try {
+    const result = await apiCall('cb_timeline', { period: currentPeriod });
+    if (result.status !== 'success') {
+      document.getElementById('cbStatsDetail').innerHTML = 
+        '<div style="color:var(--warning);font-size:11px;grid-column:1/-1;">⚠️ CB: ' + (result.message || 'gagal') + '</div>';
+      return;
+    }
+    renderCbChart(result.data || []);
+    renderCbStats(result.stats || {});
+  } catch (err) {
+    document.getElementById('cbStatsDetail').innerHTML = 
+      `<div style="color:var(--danger);font-size:11px;grid-column:1/-1;">Error: ${err.message}</div>`;
+  }
+}
+
+function renderCbChart(timeline) {
+  const ctx = document.getElementById('cbChart').getContext('2d');
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const textColor = isDark ? '#f7fafc' : '#1a202c';
+  const gridColor = isDark ? '#2d3748' : '#e2e8f0';
+
+  if (cbChart) cbChart.destroy();
+
+  if (!timeline || timeline.length === 0) {
+    cbChart = new Chart(ctx, {
+      type: 'line',
+      data: { datasets: [] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: { display: true, text: 'Tidak ada data', color: textColor, font: { size: 11 } }
+        },
+        scales: {
+          x: { type: 'time', ticks: { color: textColor, font: { size: 9 } }, grid: { color: gridColor } },
+          y: { ticks: { color: textColor, font: { size: 9 } }, grid: { color: gridColor }, min: -0.2, max: 1.2 }
+        }
+      }
+    });
+    return;
+  }
+
+  const data = timeline.map(p => ({ x: p.t, y: p.s }));
+
+  cbChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'Status CB',
+        data: data,
+        borderColor: function(context) {
+          const idx = context.dataIndex;
+          if (idx < data.length) return data[idx].y === 0 ? '#e53e3e' : '#4CAF50';
+          return '#4CAF50';
+        },
+        backgroundColor: 'rgba(76,175,80,0.1)',
+        borderWidth: 2,
+        stepped: 'after',
+        pointRadius: function(context) {
+          const idx = context.dataIndex;
+          return data[idx].y === 0 ? 4 : 0;
+        },
+        pointBackgroundColor: function(context) {
+          const idx = context.dataIndex;
+          return data[idx].y === 0 ? '#e53e3e' : '#4CAF50';
+        },
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1.5,
+        fill: true,
+        spanGaps: true
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      animation: { duration: 200 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          titleFont: { size: 10 }, bodyFont: { size: 10 },
+          callbacks: {
+            title: (items) => {
+              const d = new Date(items[0].parsed.x);
+              return d.toLocaleString('id-ID', {
+                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+              });
+            },
+            label: (item) => item.parsed.y === 1 ? '✅ Normal' : '⚠️ TRIP'
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: { displayFormats: { second: 'HH:mm', minute: 'HH:mm', hour: 'HH:mm', day: 'dd/MM', month: 'MMM' } },
+          ticks: { color: textColor, maxTicksLimit: 4, font: { size: 9 } },
+          grid: { color: gridColor }
+        },
+        y: {
+          min: -0.2, max: 1.2,
+          ticks: {
+            color: textColor, stepSize: 1, font: { size: 9 },
+            callback: v => v === 1 ? 'OK' : v === 0 ? 'Trip' : ''
+          },
+          grid: { color: gridColor }
+        }
+      }
+    }
+  });
+}
+
+function renderCbStats(stats) {
+  const container = document.getElementById('cbStatsDetail');
+  const header = document.getElementById('cbStatsHeader');
+
+  const tripCount = stats.tripCount || 0;
+  const tripMin = stats.tripDurationMin || 0;
+
+  if (tripCount > 0) {
+    header.innerHTML = `<span style="color:var(--danger);">⚠️ ${tripCount} trip</span>`;
+  } else {
+    header.innerHTML = `<span style="color:var(--primary);">✅ 0 trip</span>`;
+  }
+
+  let durationText = '-';
+  if (tripMin > 0) {
+    if (tripMin < 60) durationText = tripMin + ' mnt';
+    else {
+      const h = Math.floor(tripMin / 60);
+      const m = tripMin % 60;
+      durationText = h + 'j ' + m + 'm';
+    }
+  }
+
+  container.innerHTML = `
+    <div class="cb-stat-item">
+      <div class="cb-stat-label">Trip</div>
+      <div class="cb-stat-value ${tripCount > 0 ? 'danger' : 'success'}">${tripCount}×</div>
+    </div>
+    <div class="cb-stat-item">
+      <div class="cb-stat-label">Durasi</div>
+      <div class="cb-stat-value ${tripMin > 0 ? 'danger' : 'success'}">${durationText}</div>
+    </div>
+  `;
+}
+
+/* ============ HISTORY ============ */
+async function loadHistory() {
+  const date = document.getElementById('historyDate').value;
+  if (!date) { showToast('Pilih tanggal'); return; }
+  const tbody = document.querySelector('#historyTable tbody');
+  tbody.innerHTML = '<tr><td class="loading" colspan="2"><div class="spinner"></div>Memuat...</td></tr>';
+
+  try {
+    const result = await apiCall('history', { date });
+    historyData = result.data || [];
+    if (historyData.length === 0) {
+      tbody.innerHTML = '<tr><td class="loading" colspan="2">Tidak ada data</td></tr>';
+      document.getElementById('historyInfo').textContent = '';
+      return;
+    }
+    document.getElementById('historyInfo').textContent = `${historyData.length} baris • ${date}`;
+    renderHistoryTable(historyData);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td class="loading" colspan="2">Error: ${err.message}</td></tr>`;
+  }
+}
+
+function renderHistoryTable(data) {
+  if (data.length === 0) return;
+  const headers = Object.keys(data[0]);
+  const thead = document.querySelector('#historyTable thead');
+  const tbody = document.querySelector('#historyTable tbody');
+  thead.innerHTML = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+
+  const search = (document.getElementById('historySearch').value || '').toLowerCase();
+  const filtered = search ? data.filter(row => headers.some(h => String(row[h]).toLowerCase().includes(search))) : data;
+  const limited = filtered.slice(0, 200);
+
+  tbody.innerHTML = limited.map(row => {
+    return '<tr>' + headers.map(h => {
+      let val = row[h];
+      if (h === 'cb_status' && parseInt(val) === 0) return `<td class="alert">${val} TRIP</td>`;
+      return `<td>${typeof val === 'number' ? val.toFixed(2) : val}</td>`;
+    }).join('') + '</tr>';
+  }).join('');
+
+  if (filtered.length > 200) {
+    tbody.innerHTML += `<tr><td colspan="${headers.length}" style="text-align:center;color:var(--text-muted);font-size:11px;">... ${filtered.length - 200} baris lainnya</td></tr>`;
+  }
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'historySearch' && historyData.length > 0) renderHistoryTable(historyData);
+});
+
+/* ============ EXPORT CSV ============ */
+function exportCSV() {
+  if (historyData.length === 0) { showToast('Tidak ada data'); return; }
+  const headers = Object.keys(historyData[0]);
+  const rows = historyData.map(row => headers.map(h => {
+    let v = row[h];
+    if (typeof v === 'string' && (v.includes(',') || v.includes('"'))) v = '"' + v.replace(/"/g, '""') + '"';
+    return v;
+  }).join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ION9000_${document.getElementById('historyDate').value}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV ter-download');
+}
+
+/* ============ SUMMARY ============ */
+async function loadSummary() {
+  const date = document.getElementById('summaryDate').value;
+  if (!date) { showToast('Pilih tanggal'); return; }
+  const content = document.getElementById('summaryContent');
+  content.innerHTML = '<div class="loading" style="grid-column:1/-1;"><div class="spinner"></div>Memuat...</div>';
+  try {
+    const result = await apiCall('daily_summary', { date });
+    if (!result.data) {
+      content.innerHTML = '<div class="loading" style="grid-column:1/-1;">Tidak ada data</div>';
+      return;
+    }
+    let html = '';
+    Object.entries(result.data).forEach(([param, stats]) => {
+      html += `
+        <div class="summary-card">
+          <h4>${param}</h4>
+          <div class="stat"><span class="stat-label">Min</span><span class="stat-value">${formatNumber(stats.min)}</span></div>
+          <div class="stat"><span class="stat-label">Max</span><span class="stat-value">${formatNumber(stats.max)}</span></div>
+          <div class="stat"><span class="stat-label">Avg</span><span class="stat-value">${formatNumber(stats.avg)}</span></div>
+        </div>
+      `;
+    });
+    content.innerHTML = html;
+  } catch (err) {
+    content.innerHTML = `<div class="loading" style="grid-column:1/-1;">Error: ${err.message}</div>`;
+  }
+}
+
+/* ============ THEME ============ */
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  document.getElementById('themeIcon').textContent = next === 'dark' ? '☀️' : '🌙';
+  localStorage.setItem('theme', next);
+  if (historyChart) loadHistoryChart();
+  if (cbChart) loadCbTimeline();
+}
+
+(function() {
+  const saved = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  const icon = document.getElementById('themeIcon');
+  if (icon) icon.textContent = saved === 'dark' ? '☀️' : '🌙';
+})();
+
+/* ============ UTIL ============ */
+function formatNumber(v) {
+  if (v === null || v === undefined || v === '') return '-';
+  const n = parseFloat(v);
+  if (isNaN(n)) return v;
+  return n.toFixed(2);
+}
+
+function getUnits() {
+  return {
+    'Current A':'A','Current B':'A','Current C':'A','Current N':'A','Current G':'A','Current Avg':'A',
+    'Voltage A-B':'V','Voltage B-C':'V','Voltage C-A':'V','Voltage L-L Avg':'V',
+    'Active Power Total':'W','Reactive Power Total':'VAR','Apparent Power Total':'VA',
+    'Frequency':'Hz','power factor':'PF',
+    'THD Current A':'%','THD Current B':'%','THD Current C':'%','THD Current N':'%','THD Current G':'%',
+    'THD Voltage A-N':'%','THD Voltage B-N':'%','THD Voltage C-N':'%','THD Voltage 4-N':'%',
+    'TDD Current A 10 Minute':'%','TDD Current B 10 Minute':'%','TDD Current C 10 Minute':'%',
+    'Active Energy Delivered (Into Load)':'kWh',
+    'reactive Energy Delivered (Into Load)':'VARh',
+    'apparent Energy Delivered (Into Load)':'VAh',
+    'Active Energy Received (Out of Load)':'kWh',
+    'Active Power Total Last Demand':'W',
+    'Reactive Power Total Last Demand':'VAR',
+    'Apparent Power Total Last Demand':'VA',
+    'daily_usage_kwh':'kWh'
+  };
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
