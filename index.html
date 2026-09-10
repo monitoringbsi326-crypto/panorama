@@ -1,654 +1,1126 @@
-/**
- * ============================================================
- * Multi-Panel Monitoring Backend — Google Apps Script
- * ============================================================
- * Mendukung multiple panel (ION9000, panel lain, dll).
- * Setiap panel punya spreadsheet sendiri, di-rotate per bulan.
- *
- * Data dari ESP32 dikirim dengan field "panelId" (mis: "panel1")
- * Kalau tidak ada panelId, default "panel1".
- * ============================================================
- */
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#4CAF50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>ION9000 Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+:root {
+  --bg: #f5f7fa; --card-bg: #ffffff; --text: #1a202c; --text-muted: #718096;
+  --border: #e2e8f0; --primary: #4CAF50; --primary-hover: #45a049;
+  --danger: #e53e3e; --warning: #ed8936; --info: #3182ce;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08); --shadow-lg: 0 4px 12px rgba(0,0,0,0.12);
+  --nav-height: 60px;
+}
+[data-theme="dark"] {
+  --bg: #1a202c; --card-bg: #2d3748; --text: #f7fafc; --text-muted: #a0aec0;
+  --border: #4a5568; --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.5);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh;
+  transition: background 0.3s, color 0.3s; overflow-x: hidden;
+}
 
-// ============ KONFIGURASI ============
-const DRIVE_FOLDER_ID = 'GANTI_DENGAN_FOLDER_ID_ANDA';
-const RETENTION_MONTHS = 3;
-const CACHE_SECONDS = 8;
-const TOKEN_EXPIRY_DAYS = 7;
-const DEFAULT_PANEL_ID = 'panel1';
+/* LOGIN */
+#loginScreen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+.login-box {
+  background: var(--card-bg); padding: 36px 28px; border-radius: 16px;
+  box-shadow: var(--shadow-lg); width: 100%; max-width: 380px;
+}
+.login-box h1 { margin-bottom: 6px; color: var(--primary); font-size: 26px; text-align: center; }
+.login-box .sub { color: var(--text-muted); margin-bottom: 28px; text-align: center; font-size: 13px; }
+.login-box label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; }
+.login-box input {
+  width: 100%; padding: 13px 16px; border: 1px solid var(--border);
+  border-radius: 10px; font-size: 15px; margin-bottom: 16px;
+  background: var(--bg); color: var(--text); -webkit-appearance: none;
+}
+.login-box input:focus { outline: none; border-color: var(--primary); }
+.login-box button {
+  width: 100%; padding: 14px; background: var(--primary); color: white;
+  border: none; border-radius: 10px; font-size: 16px; font-weight: 600;
+  cursor: pointer; transition: background 0.2s; min-height: 48px;
+}
+.login-box button:hover { background: var(--primary-hover); }
+.login-box button:disabled { opacity: 0.6; cursor: not-allowed; }
+#loginError { color: var(--danger); margin-top: 12px; font-size: 13px; text-align: center; min-height: 18px; }
 
-// ⚠️ GANTI USERNAME & PASSWORD INI!
-const USERS = {
-  'admin': 'ion9000admin',
-  'operator': 'operator123',
-  'viewer': 'viewer123'
-};
+/* HEADER */
+header {
+  background: var(--card-bg); border-bottom: 1px solid var(--border);
+  padding: 12px 16px; display: flex; justify-content: space-between;
+  align-items: center; position: sticky; top: 0; z-index: 100;
+  box-shadow: var(--shadow); gap: 10px;
+}
+header h1 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); display: inline-block; flex-shrink: 0; }
+.status-dot.online { background: var(--primary); box-shadow: 0 0 8px var(--primary); }
+.header-right { display: flex; align-items: center; gap: 8px; }
+.user-info { font-size: 12px; color: var(--text-muted); display: none; }
+.icon-btn {
+  width: 38px; height: 38px; padding: 0; border-radius: 10px;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text); cursor: pointer; font-size: 17px;
+  display: flex; align-items: center; justify-content: center;
+}
+.icon-btn:hover { background: var(--bg); }
 
-// ============ SCRIPT PROPERTIES ============
-const PROP_TOKENS       = 'auth_tokens';
-const PROP_PANEL_INDEX  = 'panel_index';   // JSON: {panelId: {name, activeMonth, activeSSId, months: [{month,id,name}]}}
+/* TABS */
+.tabs { display: none; gap: 4px; padding: 12px 16px 0; background: var(--card-bg); border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tab {
+  padding: 10px 18px; border: none; background: transparent;
+  color: var(--text-muted); cursor: pointer; border-radius: 8px 8px 0 0;
+  font-size: 14px; font-weight: 500; white-space: nowrap;
+  border-bottom: 3px solid transparent;
+}
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.tab:hover:not(.active) { background: var(--bg); }
 
-// ============ ENTRY POINT: POST ============
-function doPost(e) {
+/* MAIN */
+main { padding: 16px; max-width: 1600px; margin: 0 auto; padding-bottom: calc(var(--nav-height) + 20px); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ALERT */
+#alertBanner {
+  display: none; background: var(--danger); color: white;
+  padding: 14px 16px; border-radius: 12px; margin-bottom: 16px;
+  align-items: center; gap: 10px; font-weight: 600; font-size: 14px;
+  animation: pulse 1.5s infinite; box-shadow: var(--shadow-lg);
+}
+#alertBanner.show { display: flex; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.75;} }
+
+/* CARDS */
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.card {
+  background: var(--card-bg); border-radius: 12px; padding: 14px;
+  box-shadow: var(--shadow); transition: all 0.2s;
+  border-left: 4px solid var(--primary); position: relative;
+}
+.card.alert { border-left-color: var(--danger); background: rgba(229,62,62,0.1); }
+.card .card-title {
+  font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.card .card-value { font-size: 20px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.card .card-unit { font-size: 11px; color: var(--text-muted); margin-left: 3px; font-weight: 500; }
+
+.status-cb-card {
+  grid-column: span 2;
+  background: linear-gradient(135deg, var(--primary) 0%, #2f855a 100%);
+  color: white; border-left: none; display: flex;
+  align-items: center; justify-content: space-between; padding: 18px;
+}
+.status-cb-card.trip {
+  background: linear-gradient(135deg, var(--danger) 0%, #9b2c2c 100%);
+  animation: pulse 1.5s infinite;
+}
+.status-cb-card .cb-icon { font-size: 32px; }
+.status-cb-card .cb-text { font-size: 20px; font-weight: 700; margin-top: 4px; }
+.status-cb-card .cb-label { font-size: 10px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; }
+
+/* CHART PANEL */
+.chart-panel {
+  background: var(--card-bg); border-radius: 12px; padding: 16px;
+  box-shadow: var(--shadow); margin-bottom: 16px;
+}
+.chart-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px; flex-wrap: wrap; gap: 10px;
+}
+.chart-header h3 { font-size: 15px; font-weight: 600; }
+
+.period-filter {
+  display: flex; gap: 6px; background: var(--bg); padding: 4px;
+  border-radius: 10px; border: 1px solid var(--border);
+}
+.period-btn {
+  flex: 1; padding: 8px 14px; border: none; background: transparent;
+  color: var(--text-muted); border-radius: 7px; cursor: pointer;
+  font-size: 13px; font-weight: 600; white-space: nowrap;
+  transition: all 0.2s; min-height: 36px;
+}
+.period-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 4px rgba(76,175,80,0.3); }
+.period-btn:not(.active):hover { background: var(--card-bg); }
+
+.param-chips {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;
+  overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch;
+}
+.chip {
+  padding: 7px 12px; border-radius: 16px; background: var(--bg);
+  border: 1px solid var(--border); font-size: 12px; cursor: pointer;
+  transition: all 0.15s; color: var(--text); white-space: nowrap;
+  user-select: none; min-height: 32px;
+  display: flex; align-items: center;
+}
+.chip.selected { background: var(--primary); color: white; border-color: var(--primary); }
+.chip:active { transform: scale(0.95); }
+
+.chart-wrap { position: relative; height: 320px; }
+.chart-info { font-size: 11px; color: var(--text-muted); margin-top: 10px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+/* CB TIMELINE */
+.cb-legend { display: flex; gap: 16px; margin-bottom: 10px; font-size: 12px; color: var(--text-muted); }
+.cb-legend-item { display: flex; align-items: center; gap: 6px; }
+.cb-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.cb-dot.normal { background: #4CAF50; }
+.cb-dot.trip { background: #e53e3e; animation: pulse 1.5s infinite; }
+
+.cb-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px; margin-top: 12px;
+}
+.cb-stat-item { background: var(--bg); border-radius: 8px; padding: 10px 12px; border: 1px solid var(--border); }
+.cb-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.cb-stat-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cb-stat-value.danger { color: var(--danger); }
+.cb-stat-value.success { color: var(--primary); }
+
+/* HISTORY */
+.history-controls {
+  background: var(--card-bg); padding: 14px; border-radius: 12px;
+  box-shadow: var(--shadow); margin-bottom: 14px;
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+}
+.history-controls input {
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card-bg); color: var(--text); font-size: 14px;
+  flex: 1; min-width: 140px; min-height: 42px;
+}
+.btn {
+  padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer;
+  font-size: 14px; font-weight: 500; transition: all 0.2s;
+  background: var(--primary); color: white; min-height: 42px;
+}
+.btn:hover { background: var(--primary-hover); }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-outline:hover { background: var(--bg); }
+
+/* TABLE */
+.table-wrap {
+  background: var(--card-bg); border-radius: 12px;
+  box-shadow: var(--shadow); overflow: auto; max-height: 500px;
+  -webkit-overflow-scrolling: touch;
+}
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th, td {
+  padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border);
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+th {
+  background: var(--bg); font-weight: 600; position: sticky; top: 0;
+  z-index: 2; font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-muted);
+}
+td.alert { color: var(--danger); font-weight: 600; }
+
+/* SUMMARY */
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.summary-card { background: var(--card-bg); border-radius: 12px; padding: 14px; box-shadow: var(--shadow); }
+.summary-card h4 {
+  font-size: 11px; color: var(--text-muted); margin-bottom: 10px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.summary-card .stat { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; font-variant-numeric: tabular-nums; }
+.summary-card .stat-label { color: var(--text-muted); }
+.summary-card .stat-value { font-weight: 600; }
+
+/* BOTTOM NAV */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: var(--nav-height); background: var(--card-bg);
+  border-top: 1px solid var(--border); display: flex;
+  z-index: 200; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.nav-btn {
+  flex: 1; border: none; background: transparent; color: var(--text-muted);
+  cursor: pointer; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px;
+  font-size: 10px; font-weight: 500; padding: 6px 4px;
+  transition: color 0.2s;
+}
+.nav-btn .nav-icon { font-size: 20px; line-height: 1; }
+.nav-btn.active { color: var(--primary); }
+.nav-btn:active { background: var(--bg); }
+
+/* LOADING */
+.loading { text-align: center; padding: 40px; color: var(--text-muted); }
+.spinner {
+  border: 3px solid var(--border); border-top-color: var(--primary);
+  border-radius: 50%; width: 30px; height: 30px;
+  animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* TOAST */
+#toast {
+  position: fixed; bottom: calc(var(--nav-height) + 16px); right: 16px; left: 16px;
+  background: var(--text); color: var(--bg);
+  padding: 12px 16px; border-radius: 10px;
+  box-shadow: var(--shadow-lg); opacity: 0; transform: translateY(20px);
+  transition: all 0.3s; z-index: 1000; font-size: 13px;
+  text-align: center; pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateY(0); }
+
+.hidden { display: none !important; }
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .tabs { display: none; }
+  .user-info { display: none; }
+  header h1 { font-size: 15px; }
+  main { padding: 12px; padding-bottom: calc(var(--nav-height) + 16px); }
+  .cards-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .card { padding: 12px; }
+  .card .card-value { font-size: 17px; }
+  .status-cb-card { grid-column: span 2; padding: 16px; }
+  .status-cb-card .cb-text { font-size: 18px; }
+  .status-cb-card .cb-icon { font-size: 28px; }
+  .chart-panel { padding: 12px; }
+  .chart-wrap { height: 260px; }
+  .period-btn { padding: 7px 10px; font-size: 12px; }
+  .history-controls { padding: 12px; }
+  .history-controls input { font-size: 16px; }
+  .summary-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .summary-card { padding: 12px; }
+  .summary-card .stat { font-size: 12px; }
+  .cb-stats { grid-template-columns: repeat(2, 1fr); }
+  .cb-stat-value { font-size: 16px; }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .tabs { display: flex; }
+  .bottom-nav { display: none; }
+  main { padding-bottom: 20px; }
+  .cards-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (min-width: 1025px) {
+  .tabs { display: flex; }
+  .bottom-nav { display: none; }
+  main { padding: 20px; padding-bottom: 20px; }
+  .user-info { display: block; }
+  .chart-wrap { height: 420px; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <h1>⚡ ION9000</h1>
+    <p class="sub">Monitoring Dashboard</p>
+    <label for="username">Username</label>
+    <input type="text" id="username" autocomplete="username" autofocus>
+    <label for="password">Password</label>
+    <input type="password" id="password" autocomplete="current-password">
+    <button id="loginBtn" onclick="doLogin()">Masuk</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header>
+    <h1><span class="status-dot" id="statusDot"></span> ION9000</h1>
+    <div class="header-right">
+      <div class="user-info" id="userName"></div>
+      <button class="icon-btn" onclick="toggleTheme()" title="Toggle tema">
+        <span id="themeIcon">🌙</span>
+      </button>
+      <button class="icon-btn" onclick="logout()" title="Logout">⏻</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="realtime">📊 Realtime</button>
+    <button class="tab" data-tab="chart">📈 Grafik</button>
+    <button class="tab" data-tab="history">📅 Histori</button>
+    <button class="tab" data-tab="summary">📋 Ringkasan</button>
+  </div>
+
+  <main>
+    <!-- REALTIME -->
+    <div class="tab-content active" id="tab-realtime">
+      <div id="alertBanner">⚠️ <span id="alertText">CB TRIP!</span></div>
+      <div class="cards-grid" id="cardsGrid">
+        <div class="loading"><div class="spinner"></div>Memuat...</div>
+      </div>
+    </div>
+
+    <!-- CHART -->
+    <div class="tab-content" id="tab-chart">
+      <div class="chart-panel">
+        <div class="chart-header">
+          <h3>📈 Grafik Parameter</h3>
+          <div class="period-filter">
+            <button class="period-btn active" data-period="1d" onclick="setPeriod('1d')">1 Hari</button>
+            <button class="period-btn" data-period="1w" onclick="setPeriod('1w')">1 Minggu</button>
+            <button class="period-btn" data-period="1m" onclick="setPeriod('1m')">1 Bulan</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 8px; font-size: 12px; color: var(--text-muted);">
+          Pilih parameter (bisa lebih dari satu):
+        </div>
+        <div class="param-chips" id="paramChips"></div>
+
+        <div class="chart-wrap">
+          <canvas id="historyChart"></canvas>
+        </div>
+        <div class="chart-info" id="chartInfo"></div>
+      </div>
+
+      <!-- CB TRIP TIMELINE -->
+      <div class="chart-panel">
+        <div class="chart-header">
+          <h3>⚡ Grafik Status CB</h3>
+          <span id="cbStatsHeader" style="font-size:12px;color:var(--text-muted);"></span>
+        </div>
+
+        <div class="cb-legend">
+          <span class="cb-legend-item"><span class="cb-dot normal"></span>Normal (ON)</span>
+          <span class="cb-legend-item"><span class="cb-dot trip"></span>Trip</span>
+        </div>
+
+        <div class="chart-wrap" style="height: 160px;">
+          <canvas id="cbChart"></canvas>
+        </div>
+
+        <div class="cb-stats" id="cbStatsDetail"></div>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="tab-content" id="tab-history">
+      <div class="history-controls">
+        <input type="date" id="historyDate">
+        <input type="text" id="historySearch" placeholder="🔍 Cari...">
+        <button class="btn" onclick="loadHistory()">Muat</button>
+        <button class="btn btn-outline" onclick="exportCSV()">📥 CSV</button>
+      </div>
+      <div id="historyInfo" style="margin-bottom: 10px; color: var(--text-muted); font-size: 12px;"></div>
+      <div class="table-wrap">
+        <table id="historyTable">
+          <thead></thead>
+          <tbody><tr><td class="loading"><div class="spinner"></div>Pilih tanggal & klik Muat</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SUMMARY -->
+    <div class="tab-content" id="tab-summary">
+      <div class="history-controls">
+        <input type="date" id="summaryDate">
+        <button class="btn" onclick="loadSummary()">Muat Ringkasan</button>
+      </div>
+      <div id="summaryContent" class="summary-grid">
+        <div class="loading" style="grid-column: 1/-1;">
+          <div class="spinner"></div>Pilih tanggal
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="realtime" onclick="switchTab('realtime')">
+      <span class="nav-icon">📊</span>Realtime
+    </button>
+    <button class="nav-btn" data-tab="chart" onclick="switchTab('chart')">
+      <span class="nav-icon">📈</span>Grafik
+    </button>
+    <button class="nav-btn" data-tab="history" onclick="switchTab('history')">
+      <span class="nav-icon">📅</span>Histori
+    </button>
+    <button class="nav-btn" data-tab="summary" onclick="switchTab('summary')">
+      <span class="nav-icon">📋</span>Ringkasan
+    </button>
+  </nav>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============ KONFIG ============ */
+const API_URL = "https://script.google.com/macros/s/AKfycbxAFAVCym991JDn6hsSyCQj0M1dve1r-QtJbdN4s0e2NFic328ULlXGPfRFV04Zow_GKQ/exec";
+const REFRESH_INTERVAL_MS = 10000;
+
+/* ============ STATE ============ */
+let authToken = null;
+let currentUser = null;
+let refreshTimer = null;
+let historyChart = null;
+let cbChart = null;
+let currentPeriod = '1d';
+let selectedParams = new Set();
+let historyData = [];
+
+const COLORS = [
+  '#4CAF50', '#3182ce', '#ed8936', '#e53e3e', '#805ad5',
+  '#38b2ac', '#d69e2e', '#dd6b20', '#319795', '#b83280'
+];
+
+/* ============ LOGIN ============ */
+async function doLogin() {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+
+  errEl.textContent = '';
+  if (!username || !password) { errEl.textContent = 'Isi username & password'; return; }
+
+  btn.disabled = true; btn.textContent = 'Memproses...';
+
   try {
-    if (!e || !e.postData || !e.postData.contents) {
-      return jsonResponse({ status: 'error', message: 'No POST data' });
-    }
-    const body = JSON.parse(e.postData.contents);
-
-    if (body.action === 'login') {
-      return handleLogin(body);
-    }
-
-    // Data sensor — cek panelId
-    const panelId = body.panelId || DEFAULT_PANEL_ID;
-    // Buang panelId dari data sebelum disimpan (biar tidak jadi kolom)
-    const data = Object.assign({}, body);
-    delete data.panelId;
-    delete data.action;
-
-    const result = writeToSheet(panelId, data);
-    return jsonResponse({
-      status: 'success',
-      message: 'Data tersimpan',
-      panelId: panelId,
-      row: result.row,
-      sheet: result.sheetName,
-      timestamp: result.timestamp
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'login', username, password })
     });
+    const result = await res.json();
+
+    if (result.status !== 'success' || !result.token) {
+      errEl.textContent = result.message || 'Login gagal';
+      btn.disabled = false; btn.textContent = 'Masuk';
+      return;
+    }
+
+    authToken = result.token;
+    currentUser = result.user;
+    localStorage.setItem('auth_token', authToken);
+    localStorage.setItem('auth_user', currentUser);
+    localStorage.setItem('auth_expires', result.expires);
+    showApp();
   } catch (err) {
-    console.error('doPost error:', err);
-    return jsonResponse({ status: 'error', message: err.message });
+    errEl.textContent = 'Error: ' + err.message;
+    btn.disabled = false; btn.textContent = 'Masuk';
   }
 }
 
-// ============ ENTRY POINT: GET ============
-function doGet(e) {
-  try {
-    const action = (e.parameter.action || 'realtime').toLowerCase();
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !document.getElementById('loginScreen').classList.contains('hidden')) doLogin();
+});
 
-    if (action === 'health') {
-      return jsonResponse({ status: 'ok', time: new Date().toISOString() });
-    }
-
-    if (action === 'login') {
-      return handleLogin(e.parameter);
-    }
-
-    const token = e.parameter.token;
-    const user = validateToken(token);
-    if (!user) {
-      return jsonResponse({ status: 'error', message: 'Unauthorized' }, 401);
-    }
-
-    const panelId = e.parameter.panelId || DEFAULT_PANEL_ID;
-
-    switch (action) {
-      case 'realtime':      return jsonResponse(getRealtime(panelId));
-      case 'latest':        return jsonResponse(getLatest(panelId, parseInt(e.parameter.limit) || 100));
-      case 'history':       return jsonResponse(getHistory(panelId, e.parameter.date));
-      case 'months':        return jsonResponse(getAvailableMonths(panelId));
-      case 'daily_summary': return jsonResponse(getDailySummary(panelId, e.parameter.date));
-      case 'chart':         return jsonResponse(getChartData(panelId, e.parameter.period, e.parameter.param, e.parameter.date));
-      case 'cb_timeline':   return jsonResponse(getCbTimeline(panelId, e.parameter.period, e.parameter.date));
-      case 'panels':        return jsonResponse(listPanels());
-      case 'check':         return jsonResponse({ status: 'success', user: user });
-      default:              return jsonResponse({ status: 'error', message: 'Unknown action' });
-    }
-  } catch (err) {
-    console.error('doGet error:', err);
-    return jsonResponse({ status: 'error', message: err.message }, 500);
-  }
+function showApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('userName').textContent = '👤 ' + currentUser;
+  initApp();
 }
 
-// ============ LOGIN ============
-function handleLogin(params) {
-  const username = params.username;
-  const password = params.password;
-
-  if (!username || !password) {
-    return jsonResponse({ status: 'error', message: 'Username & password wajib diisi' });
-  }
-
-  if (!USERS[username] || USERS[username] !== password) {
-    Utilities.sleep(500);
-    return jsonResponse({ status: 'error', message: 'Username atau password salah' });
-  }
-
-  const token = generateToken();
-  const expires = Date.now() + (TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
-
-  const props = PropertiesService.getScriptProperties();
-  let tokens = {};
-  try { tokens = JSON.parse(props.getProperty(PROP_TOKENS) || '{}'); } catch (e) { tokens = {}; }
-
-  const now = Date.now();
-  Object.keys(tokens).forEach(t => {
-    if (tokens[t].expires < now) delete tokens[t];
-  });
-
-  tokens[token] = { user: username, expires: expires };
-  props.setProperty(PROP_TOKENS, JSON.stringify(tokens));
-
-  return jsonResponse({
-    status: 'success',
-    token: token,
-    user: username,
-    expires: expires
-  });
+function logout() {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_user');
+  localStorage.removeItem('auth_expires');
+  if (refreshTimer) clearInterval(refreshTimer);
+  location.reload();
 }
 
-function generateToken() {
-  const bytes = [];
-  for (let i = 0; i < 32; i++) bytes.push(Math.floor(Math.random() * 256));
-  return Utilities.base64EncodeWebSafe(bytes);
-}
-
-function validateToken(token) {
-  if (!token) return null;
-  const props = PropertiesService.getScriptProperties();
-  let tokens = {};
-  try { tokens = JSON.parse(props.getProperty(PROP_TOKENS) || '{}'); } catch (e) { return null; }
-
-  const entry = tokens[token];
-  if (!entry) return null;
-  if (entry.expires < Date.now()) {
-    delete tokens[token];
-    props.setProperty(PROP_TOKENS, JSON.stringify(tokens));
-    return null;
-  }
-  return { username: entry.user };
-}
-
-// ============ PANEL INDEX MANAGEMENT ============
-function getPanelIndex() {
-  const props = PropertiesService.getScriptProperties();
-  try {
-    return JSON.parse(props.getProperty(PROP_PANEL_INDEX) || '{}');
-  } catch (e) { return {}; }
-}
-
-function savePanelIndex(index) {
-  const props = PropertiesService.getScriptProperties();
-  props.setProperty(PROP_PANEL_INDEX, JSON.stringify(index));
-}
-
-function ensurePanel(panelId) {
-  const index = getPanelIndex();
-  if (!index[panelId]) {
-    index[panelId] = {
-      name: panelId.charAt(0).toUpperCase() + panelId.slice(1),
-      activeMonth: null,
-      activeSSId: null,
-      months: []
-    };
-    savePanelIndex(index);
-  }
-  return index[panelId];
-}
-
-function listPanels() {
-  const index = getPanelIndex();
-  const panels = Object.keys(index).map(id => ({
-    id: id,
-    name: index[id].name,
-    activeMonth: index[id].activeMonth,
-    monthsCount: (index[id].months || []).length
-  }));
-  return { status: 'success', data: panels };
-}
-
-// ============ TULIS DATA ============
-function writeToSheet(panelId, data) {
-  const now = new Date();
-  const monthKey = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyy-MM');
-  const timestamp = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyy-MM-dd HH:mm:ss');
-
-  const ss = getOrCreateMonthlySpreadsheet(panelId, monthKey);
-  const sheet = ss.getSheetByName('Data') || ss.insertSheet('Data');
-  const headers = getOrCreateHeaders(sheet, data);
-
-  const row = headers.map(h => {
-    if (h === 'timestamp') return timestamp;
-    return data[h] !== undefined && data[h] !== null ? data[h] : '';
-  });
-
-  sheet.appendRow(row);
-  cleanupOldSpreadsheets(panelId);
-
-  return { row: sheet.getLastRow(), sheetName: ss.getName(), timestamp: timestamp };
-}
-
-function getOrCreateHeaders(sheet, data) {
-  if (sheet.getLastRow() === 0) {
-    const headers = ['timestamp'].concat(Object.keys(data));
-    sheet.appendRow(headers);
-    sheet.getRange(1, 1, 1, headers.length)
-      .setFontWeight('bold')
-      .setBackground('#4CAF50')
-      .setFontColor('#FFFFFF');
-    sheet.setFrozenRows(1);
-    return headers;
-  }
-  return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-}
-
-// ============ SPREADSHEET BULANAN (per panel) ============
-function getOrCreateMonthlySpreadsheet(panelId, monthKey) {
-  const index = getPanelIndex();
-  const panel = index[panelId];
-
-  if (panel && panel.activeMonth === monthKey && panel.activeSSId) {
-    try {
-      return SpreadsheetApp.openById(panel.activeSSId);
-    } catch (err) {
-      console.warn('Active spreadsheet not found: ' + err.message);
-    }
-  }
-
-  const ssName = 'Monitor_' + panelId + '_' + monthKey;
-  const ss = SpreadsheetApp.create(ssName);
-
-  if (DRIVE_FOLDER_ID && DRIVE_FOLDER_ID !== 'GANTI_DENGAN_FOLDER_ID_ANDA') {
-    try {
-      const file = DriveApp.getFileById(ss.getId());
-      const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
-      folder.addFile(file);
-      DriveApp.getRootFolder().removeFile(file);
-    } catch (err) {
-      console.warn('Cannot move to folder: ' + err.message);
-    }
-  }
-
-  ss.getSheets()[0].setName('Data');
-
-  // Update index
-  const idx = getPanelIndex();
-  if (!idx[panelId]) {
-    idx[panelId] = { name: panelId, activeMonth: null, activeSSId: null, months: [] };
-  }
-  idx[panelId].activeMonth = monthKey;
-  idx[panelId].activeSSId = ss.getId();
-  idx[panelId].months = (idx[panelId].months || []).filter(m => m.month !== monthKey);
-  idx[panelId].months.push({ month: monthKey, id: ss.getId(), name: ssName });
-  idx[panelId].months.sort((a, b) => b.month.localeCompare(a.month));
-
-  savePanelIndex(idx);
-  return ss;
-}
-
-// ============ RETENSI (per panel) ============
-function cleanupOldSpreadsheets(panelId) {
-  const idx = getPanelIndex();
-  const panel = idx[panelId];
-  if (!panel || !panel.months || panel.months.length <= RETENTION_MONTHS) return;
-
-  panel.months.sort((a, b) => b.month.localeCompare(a.month));
-  const toKeep = panel.months.slice(0, RETENTION_MONTHS);
-  const toDelete = panel.months.slice(RETENTION_MONTHS);
-
-  toDelete.forEach(item => {
-    try {
-      DriveApp.getFileById(item.id).setTrashed(true);
-      console.log('Trashed: ' + item.name);
-    } catch (err) {
-      console.warn('Cannot trash ' + item.name + ': ' + err.message);
-    }
-  });
-  panel.months = toKeep;
-  savePanelIndex(idx);
-}
-
-// ============ HELPER: BUKA SHEET PANEL ============
-function getPanelSheet(panelId, monthKey) {
-  const idx = getPanelIndex();
-  const panel = idx[panelId];
-  if (!panel) return null;
-
-  let entry;
-  if (monthKey) {
-    entry = (panel.months || []).find(m => m.month === monthKey);
+window.addEventListener('load', () => {
+  const token = localStorage.getItem('auth_token');
+  const user = localStorage.getItem('auth_user');
+  const expires = parseInt(localStorage.getItem('auth_expires') || '0');
+  if (token && user && expires > Date.now()) {
+    authToken = token; currentUser = user; showApp();
   } else {
-    entry = (panel.months || []).find(m => m.month === panel.activeMonth);
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('auth_expires');
   }
-  if (!entry) return null;
+});
 
+/* ============ INIT ============ */
+function initApp() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('historyDate').value = today;
+  document.getElementById('summaryDate').value = today;
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+  });
+
+  loadRealtime();
+  loadParamChips();
+
+  refreshTimer = setInterval(() => {
+    if (document.querySelector('.tab-content.active').id === 'tab-realtime') loadRealtime();
+  }, REFRESH_INTERVAL_MS);
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.nav-btn').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  if (name === 'chart') {
+    if (selectedParams.size > 0) loadHistoryChart();
+    loadCbTimeline();
+  }
+}
+
+/* ============ API ============ */
+async function apiCall(action, params = {}) {
+  const url = new URL(API_URL);
+  url.searchParams.set('action', action);
+  url.searchParams.set('token', authToken);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+
+  const res = await fetch(url.toString());
+  if (res.status === 401) {
+    showToast('Sesi habis, login ulang');
+    setTimeout(logout, 1500);
+    throw new Error('Unauthorized');
+  }
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return await res.json();
+}
+
+/* ============ REALTIME ============ */
+async function loadRealtime() {
   try {
-    const ss = SpreadsheetApp.openById(entry.id);
-    return { ss: ss, sheet: ss.getSheetByName('Data'), entry: entry };
+    const result = await apiCall('realtime');
+    document.getElementById('statusDot').classList.add('online');
+    if (!result.data) {
+      document.getElementById('cardsGrid').innerHTML = '<div class="loading">Belum ada data</div>';
+      return;
+    }
+    renderCards(result.data);
+    checkCBAlert(result.data.cb_status);
   } catch (err) {
-    return null;
+    document.getElementById('statusDot').classList.remove('online');
   }
 }
 
-// ============ API: REALTIME ============
-function getRealtime(panelId) {
-  const cache = CacheService.getScriptCache();
-  const cacheKey = 'realtime_' + panelId;
-  const cached = cache.get(cacheKey);
-  if (cached) return JSON.parse(cached);
+function renderCards(data) {
+  const grid = document.getElementById('cardsGrid');
+  const cbStatus = parseInt(data.cb_status);
+  const units = getUnits();
+  let html = `
+    <div class="status-cb-card ${cbStatus === 0 ? 'trip' : ''}">
+      <div>
+        <div class="cb-label">Status CB</div>
+        <div class="cb-text">${cbStatus === 0 ? 'TRIP' : 'NORMAL'}</div>
+      </div>
+      <div class="cb-icon">${cbStatus === 0 ? '⚠️' : '✅'}</div>
+    </div>
+  `;
 
-  const info = getPanelSheet(panelId);
-  if (!info || !info.sheet || info.sheet.getLastRow() < 2) {
-    return { status: 'success', data: null, panelId: panelId };
+  if (data.daily_usage_kwh !== undefined) {
+    html += `
+      <div class="card">
+        <div class="card-title">Daya Hari Ini</div>
+        <div class="card-value">${formatNumber(data.daily_usage_kwh)}<span class="card-unit">kWh</span></div>
+      </div>
+    `;
   }
 
-  const sheet = info.sheet;
-  const lastRow = sheet.getLastRow();
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const values = sheet.getRange(lastRow, 1, 1, headers.length).getValues()[0];
-
-  const obj = {};
-  headers.forEach((h, i) => obj[h] = values[i]);
-
-  const result = { status: 'success', data: obj, panelId: panelId };
-  cache.put(cacheKey, JSON.stringify(result), CACHE_SECONDS);
-  return result;
-}
-
-// ============ API: LATEST ============
-function getLatest(panelId, limit) {
-  const info = getPanelSheet(panelId);
-  if (!info || !info.sheet || info.sheet.getLastRow() < 2) {
-    return { status: 'success', data: [], panelId: panelId };
-  }
-
-  const sheet = info.sheet;
-  const lastRow = sheet.getLastRow();
-  const startRow = Math.max(2, lastRow - limit + 1);
-  const numRows = lastRow - startRow + 1;
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const values = sheet.getRange(startRow, 1, numRows, headers.length).getValues();
-
-  const data = values.map(row => {
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
-    return obj;
+  Object.keys(data).forEach(key => {
+    if (key === 'timestamp' || key === 'cb_status' || key === 'daily_usage_kwh') return;
+    const value = data[key];
+    const unit = units[key] || '';
+    const numVal = parseFloat(value);
+    const isAlert = key.toLowerCase().includes('thd') && numVal > 5;
+    html += `
+      <div class="card ${isAlert ? 'alert' : ''}">
+        <div class="card-title" title="${key}">${key}</div>
+        <div class="card-value">${formatNumber(value)}<span class="card-unit">${unit}</span></div>
+      </div>
+    `;
   });
-  return { status: 'success', data: data, panelId: panelId };
+
+  grid.innerHTML = html;
 }
 
-// ============ API: HISTORY ============
-function getHistory(panelId, dateStr) {
-  if (!dateStr) return { status: 'error', message: 'date required' };
-  const monthKey = dateStr.substring(0, 7);
-  const info = getPanelSheet(panelId, monthKey);
-  if (!info || !info.sheet || info.sheet.getLastRow() < 2) {
-    return { status: 'success', data: [], panelId: panelId };
-  }
-
-  const sheet = info.sheet;
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const allValues = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues();
-
-  const filtered = allValues.filter(row => String(row[0]).startsWith(dateStr));
-  const data = filtered.map(row => {
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
-    return obj;
-  });
-  return { status: 'success', data: data, count: data.length, panelId: panelId };
-}
-
-// ============ API: MONTHS ============
-function getAvailableMonths(panelId) {
-  const idx = getPanelIndex();
-  const panel = idx[panelId];
-  return { status: 'success', data: (panel && panel.months) || [], panelId: panelId };
-}
-
-// ============ API: DAILY SUMMARY ============
-function getDailySummary(panelId, dateStr) {
-  const hist = getHistory(panelId, dateStr);
-  if (!hist.data || hist.data.length === 0) {
-    return { status: 'success', data: null, panelId: panelId };
-  }
-  const rows = hist.data;
-  const numericKeys = Object.keys(rows[0]).filter(k => k !== 'timestamp' && k !== 'cb_status');
-  const summary = {};
-  numericKeys.forEach(key => {
-    const nums = rows.map(r => parseFloat(r[key])).filter(n => !isNaN(n));
-    if (nums.length === 0) return;
-    summary[key] = {
-      min: Math.min.apply(null, nums),
-      max: Math.max.apply(null, nums),
-      avg: nums.reduce((a, b) => a + b, 0) / nums.length
-    };
-  });
-  return { status: 'success', data: summary, count: rows.length, panelId: panelId };
-}
-
-// ============ API: CHART DATA ============
-function getChartData(panelId, period, param, dateStr) {
-  if (!period || !param) {
-    return { status: 'error', message: 'period & param required' };
-  }
-  if (!dateStr) {
-    dateStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
-  }
-
-  const endDate = new Date(dateStr + 'T23:59:59+07:00');
-  let startDate = new Date(endDate);
-  let bucketMinutes = 5;
-
-  if (period === '1d') {
-    startDate.setDate(startDate.getDate() - 1);
-    bucketMinutes = 5;
-  } else if (period === '1w') {
-    startDate.setDate(startDate.getDate() - 7);
-    bucketMinutes = 60;
-  } else if (period === '1m') {
-    startDate.setDate(startDate.getDate() - 30);
-    bucketMinutes = 180;
+function checkCBAlert(cbStatus) {
+  const banner = document.getElementById('alertBanner');
+  if (parseInt(cbStatus) === 0) {
+    banner.classList.add('show');
+    document.getElementById('alertText').textContent = 'CB TRIP! Periksa panel listrik.';
+    if (Notification.permission === 'granted') {
+      new Notification('⚠️ CB TRIP', { body: 'Circuit Breaker dalam kondisi TRIP!' });
+    }
   } else {
-    return { status: 'error', message: 'period harus 1d, 1w, atau 1m' };
+    banner.classList.remove('show');
   }
-
-  const startMonth = Utilities.formatDate(startDate, 'Asia/Jakarta', 'yyyy-MM');
-  const endMonth = Utilities.formatDate(endDate, 'Asia/Jakarta', 'yyyy-MM');
-
-  const idx = getPanelIndex();
-  const panel = idx[panelId];
-  if (!panel || !panel.months) return { status: 'success', data: [], panelId: panelId };
-
-  const months = panel.months
-    .filter(m => m.month >= startMonth && m.month <= endMonth)
-    .map(m => m.month);
-
-  const allRows = [];
-  months.forEach(m => {
-    const info = getPanelSheet(panelId, m);
-    if (!info || !info.sheet) return;
-
-    try {
-      const sheet = info.sheet;
-      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      const tsIdx = headers.indexOf('timestamp');
-      const paramIdx = headers.indexOf(param);
-      if (tsIdx === -1 || paramIdx === -1) return;
-
-      const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues();
-      values.forEach(row => {
-        const ts = new Date(String(row[tsIdx]).replace(' ', 'T') + '+07:00');
-        if (isNaN(ts.getTime())) return;
-        if (ts < startDate || ts > endDate) return;
-        const val = parseFloat(row[paramIdx]);
-        if (isNaN(val)) return;
-        allRows.push({ ts: ts.getTime(), val: val });
-      });
-    } catch (err) {
-      console.warn('Skip ' + m + ': ' + err.message);
-    }
-  });
-
-  allRows.sort((a, b) => a.ts - b.ts);
-
-  const bucketMs = bucketMinutes * 60 * 1000;
-  const buckets = {};
-  allRows.forEach(r => {
-    const key = Math.floor(r.ts / bucketMs) * bucketMs;
-    if (!buckets[key]) buckets[key] = [];
-    buckets[key].push(r.val);
-  });
-
-  const data = Object.keys(buckets).sort().map(key => {
-    const vals = buckets[key];
-    return {
-      t: parseInt(key),
-      avg: vals.reduce((a, b) => a + b, 0) / vals.length,
-      min: Math.min.apply(null, vals),
-      max: Math.max.apply(null, vals),
-      count: vals.length
-    };
-  });
-
-  return {
-    status: 'success',
-    data: data,
-    panelId: panelId,
-    meta: {
-      period: period, param: param,
-      start: startDate.toISOString(),
-      end: endDate.toISOString(),
-      bucketMinutes: bucketMinutes,
-      totalRaw: allRows.length,
-      totalBuckets: data.length
-    }
-  };
 }
 
-// ============ API: CB TIMELINE ============
-function getCbTimeline(panelId, period, dateStr) {
-  if (!period) period = '1d';
-  if (!dateStr) {
-    dateStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
+/* ============ PARAM CHIPS ============ */
+async function loadParamChips() {
+  try {
+    const result = await apiCall('realtime');
+    if (!result.data) return;
+    const container = document.getElementById('paramChips');
+    container.innerHTML = '';
+    Object.keys(result.data).forEach(key => {
+      if (key === 'timestamp' || key === 'cb_status') return;
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.textContent = key;
+      chip.dataset.param = key;
+      chip.onclick = () => toggleParam(key);
+      container.appendChild(chip);
+    });
+  } catch (err) {}
+}
+
+function toggleParam(param) {
+  if (selectedParams.has(param)) {
+    selectedParams.delete(param);
+  } else {
+    if (selectedParams.size >= 5) {
+      showToast('Maksimal 5 parameter sekaligus');
+      return;
+    }
+    selectedParams.add(param);
   }
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.classList.toggle('selected', selectedParams.has(chip.dataset.param));
+  });
+  if (selectedParams.size > 0) loadHistoryChart();
+  else if (historyChart) { historyChart.destroy(); historyChart = null; }
+}
 
-  const endDate = new Date(dateStr + 'T23:59:59+07:00');
-  let startDate = new Date(endDate);
+/* ============ PERIOD ============ */
+function setPeriod(period) {
+  currentPeriod = period;
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.period === period);
+  });
+  if (selectedParams.size > 0) loadHistoryChart();
+  loadCbTimeline();
+}
 
-  if (period === '1d') {
-    startDate.setDate(startDate.getDate() - 1);
-  } else if (period === '1w') {
-    startDate.setDate(startDate.getDate() - 7);
-  } else if (period === '1m') {
-    startDate.setDate(startDate.getDate() - 30);
-  }
+/* ============ CHART PARAMETER ============ */
+async function loadHistoryChart() {
+  if (selectedParams.size === 0) return;
 
-  const startMonth = Utilities.formatDate(startDate, 'Asia/Jakarta', 'yyyy-MM');
-  const endMonth = Utilities.formatDate(endDate, 'Asia/Jakarta', 'yyyy-MM');
+  const ctx = document.getElementById('historyChart').getContext('2d');
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const textColor = isDark ? '#f7fafc' : '#1a202c';
+  const gridColor = isDark ? '#4a5568' : '#e2e8f0';
 
-  const idx = getPanelIndex();
-  const panel = idx[panelId];
-  if (!panel || !panel.months) {
-    return { status: 'success', data: [], stats: {}, panelId: panelId };
-  }
+  document.getElementById('chartInfo').textContent = 'Memuat data...';
 
-  const months = panel.months
-    .filter(m => m.month >= startMonth && m.month <= endMonth)
-    .map(m => m.month);
+  const datasets = [];
+  let i = 0;
+  let totalPoints = 0;
+  let bucketInfo = '';
 
-  const timeline = [];
-
-  months.forEach(m => {
-    const info = getPanelSheet(panelId, m);
-    if (!info || !info.sheet) return;
-
+  for (const param of selectedParams) {
     try {
-      const sheet = info.sheet;
-      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      const tsIdx = headers.indexOf('timestamp');
-      const cbIdx = headers.indexOf('cb_status');
-      if (tsIdx === -1 || cbIdx === -1) return;
-
-      const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues();
-      values.forEach(row => {
-        const ts = new Date(String(row[tsIdx]).replace(' ', 'T') + '+07:00');
-        if (isNaN(ts.getTime())) return;
-        if (ts < startDate || ts > endDate) return;
-        const status = parseInt(row[cbIdx]);
-        if (isNaN(status)) return;
-        timeline.push({ t: ts.getTime(), s: status });
-      });
+      const result = await apiCall('chart', { period: currentPeriod, param: param });
+      if (result.status === 'success' && result.data.length > 0) {
+        datasets.push({
+          label: param,
+          data: result.data.map(d => ({ x: d.t, y: d.avg })),
+          borderColor: COLORS[i % COLORS.length],
+          backgroundColor: COLORS[i % COLORS.length] + '20',
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 1.5,
+          fill: false,
+          spanGaps: true
+        });
+        totalPoints += result.data.length;
+        if (result.meta) bucketInfo = `${result.meta.bucketMinutes} menit/bucket`;
+        i++;
+      }
     } catch (err) {
-      console.warn('Skip ' + m + ': ' + err.message);
+      console.warn('Chart error for ' + param + ':', err);
     }
-  });
-
-  timeline.sort((a, b) => a.t - b.t);
-
-  let tripCount = 0;
-  let tripDurationMs = 0;
-  let lastTripStart = null;
-  let prevStatus = null;
-
-  timeline.forEach(point => {
-    if (point.s === 0 && prevStatus !== 0) {
-      tripCount++;
-      lastTripStart = point.t;
-    } else if (point.s === 1 && prevStatus === 0 && lastTripStart !== null) {
-      tripDurationMs += (point.t - lastTripStart);
-      lastTripStart = null;
-    }
-    prevStatus = point.s;
-  });
-
-  if (lastTripStart !== null && timeline.length > 0) {
-    tripDurationMs += (timeline[timeline.length - 1].t - lastTripStart);
   }
 
-  return {
-    status: 'success',
-    data: timeline,
-    panelId: panelId,
-    stats: {
-      tripCount: tripCount,
-      tripDurationMs: tripDurationMs,
-      tripDurationMin: Math.round(tripDurationMs / 60000),
-      totalPoints: timeline.length
+  if (historyChart) historyChart.destroy();
+
+  if (datasets.length === 0) {
+    document.getElementById('chartInfo').textContent = 'Tidak ada data untuk periode ini';
+    return;
+  }
+
+  historyChart = new Chart(ctx, {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      animation: { duration: 300 },
+      plugins: {
+        legend: { labels: { color: textColor, boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              const d = new Date(items[0].parsed.x);
+              return d.toLocaleString('id-ID', {
+                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+              });
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            displayFormats: {
+              second: 'HH:mm', minute: 'HH:mm', hour: 'HH:mm',
+              day: 'dd MMM', week: 'dd MMM', month: 'MMM yyyy'
+            }
+          },
+          ticks: { color: textColor, maxTicksLimit: 8 },
+          grid: { color: gridColor }
+        },
+        y: {
+          ticks: { color: textColor },
+          grid: { color: gridColor }
+        }
+      }
+    }
+  });
+
+  const periodLabel = currentPeriod === '1d' ? '1 Hari' : currentPeriod === '1w' ? '1 Minggu' : '1 Bulan';
+  document.getElementById('chartInfo').innerHTML = `
+    <span>📊 ${periodLabel} • ${totalPoints} titik • ${bucketInfo}</span>
+    <span>${selectedParams.size} parameter</span>
+  `;
+}
+
+/* ============ CB TIMELINE ============ */
+async function loadCbTimeline() {
+  try {
+    const result = await apiCall('cb_timeline', { period: currentPeriod });
+    if (result.status !== 'success') {
+      document.getElementById('cbStatsDetail').innerHTML = 
+        '<div style="color:var(--text-muted);font-size:12px;">Gagal memuat data CB</div>';
+      return;
+    }
+    renderCbChart(result.data || []);
+    renderCbStats(result.stats || {});
+  } catch (err) {
+    console.error('CB timeline error:', err);
+    document.getElementById('cbStatsDetail').innerHTML = 
+      `<div style="color:var(--danger);font-size:12px;">Error: ${err.message}</div>`;
+  }
+}
+
+function renderCbChart(timeline) {
+  const ctx = document.getElementById('cbChart').getContext('2d');
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const textColor = isDark ? '#f7fafc' : '#1a202c';
+  const gridColor = isDark ? '#4a5568' : '#e2e8f0';
+
+  if (cbChart) cbChart.destroy();
+
+  if (!timeline || timeline.length === 0) {
+    cbChart = new Chart(ctx, {
+      type: 'line',
+      data: { datasets: [] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: { display: true, text: 'Tidak ada data', color: textColor }
+        },
+        scales: {
+          x: { type: 'time', ticks: { color: textColor }, grid: { color: gridColor } },
+          y: { ticks: { color: textColor }, grid: { color: gridColor }, min: -0.2, max: 1.2 }
+        }
+      }
+    });
+    return;
+  }
+
+  const data = timeline.map(p => ({ x: p.t, y: p.s }));
+
+  cbChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'Status CB',
+        data: data,
+        borderColor: function(context) {
+          const idx = context.dataIndex;
+          if (idx < data.length) return data[idx].y === 0 ? '#e53e3e' : '#4CAF50';
+          return '#4CAF50';
+        },
+        backgroundColor: 'rgba(76,175,80,0.1)',
+        borderWidth: 2,
+        stepped: 'after',
+        pointRadius: function(context) {
+          const idx = context.dataIndex;
+          return data[idx].y === 0 ? 5 : 0;
+        },
+        pointBackgroundColor: function(context) {
+          const idx = context.dataIndex;
+          return data[idx].y === 0 ? '#e53e3e' : '#4CAF50';
+        },
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        fill: true,
+        spanGaps: true
+      }]
     },
-    meta: {
-      period: period,
-      start: startDate.toISOString(),
-      end: endDate.toISOString()
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      animation: { duration: 300 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              const d = new Date(items[0].parsed.x);
+              return d.toLocaleString('id-ID', {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+              });
+            },
+            label: (item) => item.parsed.y === 1 ? '✅ Normal (ON)' : '⚠️ TRIP'
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            displayFormats: {
+              second: 'HH:mm', minute: 'HH:mm', hour: 'HH:mm',
+              day: 'dd MMM', week: 'dd MMM', month: 'MMM yyyy'
+            }
+          },
+          ticks: { color: textColor, maxTicksLimit: 8 },
+          grid: { color: gridColor }
+        },
+        y: {
+          min: -0.2, max: 1.2,
+          ticks: {
+            color: textColor, stepSize: 1,
+            callback: v => v === 1 ? 'Normal' : v === 0 ? 'Trip' : ''
+          },
+          grid: { color: gridColor }
+        }
+      }
     }
+  });
+}
+
+function renderCbStats(stats) {
+  const container = document.getElementById('cbStatsDetail');
+  const header = document.getElementById('cbStatsHeader');
+
+  const tripCount = stats.tripCount || 0;
+  const tripMin = stats.tripDurationMin || 0;
+
+  if (tripCount > 0) {
+    header.innerHTML = `<span style="color:var(--danger);font-weight:600;">⚠️ ${tripCount} trip</span>`;
+  } else {
+    header.innerHTML = `<span style="color:var(--primary);">✅ Tidak ada trip</span>`;
+  }
+
+  let durationText = '-';
+  if (tripMin > 0) {
+    if (tripMin < 60) durationText = tripMin + ' mnt';
+    else {
+      const h = Math.floor(tripMin / 60);
+      const m = tripMin % 60;
+      durationText = h + 'j ' + m + 'm';
+    }
+  }
+
+  container.innerHTML = `
+    <div class="cb-stat-item">
+      <div class="cb-stat-label">Jumlah Trip</div>
+      <div class="cb-stat-value ${tripCount > 0 ? 'danger' : 'success'}">${tripCount}×</div>
+    </div>
+    <div class="cb-stat-item">
+      <div class="cb-stat-label">Durasi Trip</div>
+      <div class="cb-stat-value ${tripMin > 0 ? 'danger' : 'success'}">${durationText}</div>
+    </div>
+    <div class="cb-stat-item">
+      <div class="cb-stat-label">Total Data</div>
+      <div class="cb-stat-value">${stats.totalPoints || 0}</div>
+    </div>
+    <div class="cb-stat-item">
+      <div class="cb-stat-label">Periode</div>
+      <div class="cb-stat-value" style="font-size:14px;">
+        ${currentPeriod === '1d' ? '1 Hari' : currentPeriod === '1w' ? '1 Minggu' : '1 Bulan'}
+      </div>
+    </div>
+  `;
+}
+
+/* ============ HISTORY ============ */
+async function loadHistory() {
+  const date = document.getElementById('historyDate').value;
+  if (!date) { showToast('Pilih tanggal'); return; }
+  const tbody = document.querySelector('#historyTable tbody');
+  tbody.innerHTML = '<tr><td class="loading"><div class="spinner"></div>Memuat...</td></tr>';
+
+  try {
+    const result = await apiCall('history', { date });
+    historyData = result.data || [];
+    if (historyData.length === 0) {
+      tbody.innerHTML = '<tr><td class="loading">Tidak ada data</td></tr>';
+      document.getElementById('historyInfo').textContent = '';
+      return;
+    }
+    document.getElementById('historyInfo').textContent = `${historyData.length} baris • ${date}`;
+    renderHistoryTable(historyData);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td class="loading">Error: ${err.message}</td></tr>`;
+  }
+}
+
+function renderHistoryTable(data) {
+  if (data.length === 0) return;
+  const headers = Object.keys(data[0]);
+  const thead = document.querySelector('#historyTable thead');
+  const tbody = document.querySelector('#historyTable tbody');
+  thead.innerHTML = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+
+  const search = (document.getElementById('historySearch').value || '').toLowerCase();
+  const filtered = search ? data.filter(row => headers.some(h => String(row[h]).toLowerCase().includes(search))) : data;
+  const limited = filtered.slice(0, 500);
+
+  tbody.innerHTML = limited.map(row => {
+    return '<tr>' + headers.map(h => {
+      let val = row[h];
+      if (h === 'cb_status' && parseInt(val) === 0) return `<td class="alert">${val} TRIP</td>`;
+      return `<td>${typeof val === 'number' ? val.toFixed(2) : val}</td>`;
+    }).join('') + '</tr>';
+  }).join('');
+
+  if (filtered.length > 500) {
+    tbody.innerHTML += `<tr><td colspan="${headers.length}" style="text-align:center;color:var(--text-muted);">... ${filtered.length - 500} baris lainnya</td></tr>`;
+  }
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'historySearch' && historyData.length > 0) renderHistoryTable(historyData);
+});
+
+/* ============ EXPORT CSV ============ */
+function exportCSV() {
+  if (historyData.length === 0) { showToast('Tidak ada data'); return; }
+  const headers = Object.keys(historyData[0]);
+  const rows = historyData.map(row => headers.map(h => {
+    let v = row[h];
+    if (typeof v === 'string' && (v.includes(',') || v.includes('"'))) v = '"' + v.replace(/"/g, '""') + '"';
+    return v;
+  }).join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ION9000_${document.getElementById('historyDate').value}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV ter-download');
+}
+
+/* ============ SUMMARY ============ */
+async function loadSummary() {
+  const date = document.getElementById('summaryDate').value;
+  if (!date) { showToast('Pilih tanggal'); return; }
+  const content = document.getElementById('summaryContent');
+  content.innerHTML = '<div class="loading" style="grid-column:1/-1;"><div class="spinner"></div>Memuat...</div>';
+  try {
+    const result = await apiCall('daily_summary', { date });
+    if (!result.data) {
+      content.innerHTML = '<div class="loading" style="grid-column:1/-1;">Tidak ada data</div>';
+      return;
+    }
+    let html = '';
+    Object.entries(result.data).forEach(([param, stats]) => {
+      html += `
+        <div class="summary-card">
+          <h4>${param}</h4>
+          <div class="stat"><span class="stat-label">Min</span><span class="stat-value">${formatNumber(stats.min)}</span></div>
+          <div class="stat"><span class="stat-label">Max</span><span class="stat-value">${formatNumber(stats.max)}</span></div>
+          <div class="stat"><span class="stat-label">Avg</span><span class="stat-value">${formatNumber(stats.avg)}</span></div>
+        </div>
+      `;
+    });
+    content.innerHTML = html;
+  } catch (err) {
+    content.innerHTML = `<div class="loading" style="grid-column:1/-1;">Error: ${err.message}</div>`;
+  }
+}
+
+/* ============ THEME ============ */
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  document.getElementById('themeIcon').textContent = next === 'dark' ? '☀️' : '🌙';
+  localStorage.setItem('theme', next);
+  if (historyChart) loadHistoryChart();
+  if (cbChart) loadCbTimeline();
+}
+
+(function() {
+  const saved = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  const icon = document.getElementById('themeIcon');
+  if (icon) icon.textContent = saved === 'dark' ? '☀️' : '🌙';
+})();
+
+/* ============ UTIL ============ */
+function formatNumber(v) {
+  if (v === null || v === undefined || v === '') return '-';
+  const n = parseFloat(v);
+  if (isNaN(n)) return v;
+  return n.toFixed(2);
+}
+
+function getUnits() {
+  return {
+    'Current A':'A','Current B':'A','Current C':'A','Current N':'A','Current G':'A','Current Avg':'A',
+    'Voltage A-B':'V','Voltage B-C':'V','Voltage C-A':'V','Voltage L-L Avg':'V',
+    'Active Power Total':'W','Reactive Power Total':'VAR','Apparent Power Total':'VA',
+    'Frequency':'Hz','power factor':'PF',
+    'THD Current A':'%','THD Current B':'%','THD Current C':'%','THD Current N':'%','THD Current G':'%',
+    'THD Voltage A-N':'%','THD Voltage B-N':'%','THD Voltage C-N':'%','THD Voltage 4-N':'%',
+    'TDD Current A 10 Minute':'%','TDD Current B 10 Minute':'%','TDD Current C 10 Minute':'%',
+    'Active Energy Delivered (Into Load)':'kWh',
+    'reactive Energy Delivered (Into Load)':'VARh',
+    'apparent Energy Delivered (Into Load)':'VAh',
+    'Active Energy Received (Out of Load)':'kWh',
+    'Active Power Total Last Demand':'W',
+    'Reactive Power Total Last Demand':'VAR',
+    'Apparent Power Total Last Demand':'VA',
+    'daily_usage_kwh':'kWh'
   };
 }
 
-// ============ UTIL ============
-function jsonResponse(obj, code) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// ============ TEST ============
-function testWrite() {
-  const sample = {
-    "Current A": 12.34, "Current B": 11.23, "Current C": 10.56,
-    "Voltage A-B": 380.50, "Voltage B-C": 379.80, "Voltage C-A": 381.20,
-    "Active Power Total": 7500.25, "Frequency": 50.01,
-    "daily_usage_kwh": 45.67, "cb_status": 1
-  };
-  const result = writeToSheet('panel1', sample);
-  console.log('Test write panel1:', result);
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
 }
-
-function testWritePanel2() {
-  const sample = {
-    "Current A": 8.5, "Current B": 8.2, "Current C": 8.1,
-    "Voltage A-B": 379.0, "Active Power Total": 5000,
-    "daily_usage_kwh": 30.5, "cb_status": 1
-  };
-  const result = writeToSheet('panel2', sample);
-  console.log('Test write panel2:', result);
-}
-
-function testLogin() {
-  const result = handleLogin({ username: 'admin', password: 'ion9000admin' });
-  console.log('Test login:', result.getContent());
-}
-
-function testListPanels() {
-  console.log('Panels:', JSON.stringify(listPanels(), null, 2));
-}
+</script>
+</body>
+</html>
