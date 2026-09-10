@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#4CAF50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>ION9000 Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+:root {
+  --bg: #f5f7fa;
+  --card-bg: #ffffff;
+  --text: #1a202c;
+  --text-muted: #718096;
+  --border: #e2e8f0;
+  --primary: #4CAF50;
+  --primary-dark: #2f855a;
+  --danger: #e53e3e;
+  --warning: #ed8936;
+  --info: #3182ce;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.12);
+  --nav-height: 64px;
+  --header-height: 56px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+[data-theme="dark"] {
+  --bg: #0f1419;
+  --card-bg: #1a202c;
+  --text: #f7fafc;
+  --text-muted: #a0aec0;
+  --border: #2d3748;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow: 0 2px 8px rgba(0,0,0,0.4);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.6);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+html, body {
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
+  overflow-x: hidden;
+  font-size: 15px;
+}
+
+/* ============ LOGIN ============ */
+#loginScreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  background: linear-gradient(135deg, #4CAF50 0%, #2f855a 100%);
+}
+.login-box {
+  background: var(--card-bg);
+  padding: 32px 24px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 400px;
+}
+.login-logo {
+  text-align: center;
+  font-size: 56px;
+  margin-bottom: 8px;
+  line-height: 1;
+}
+.login-box h1 {
+  margin-bottom: 4px;
+  color: var(--primary);
+  font-size: 24px;
+  text-align: center;
+  font-weight: 700;
+}
+.login-box .sub {
+  color: var(--text-muted);
+  margin-bottom: 24px;
+  text-align: center;
+  font-size: 13px;
+}
+.login-box label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.login-box input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  font-size: 16px;
+  margin-bottom: 16px;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-appearance: none;
+  transition: border-color 0.2s;
+}
+.login-box input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+.login-box button {
+  width: 100%;
+  padding: 16px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 52px;
+  letter-spacing: 0.5px;
+}
+.login-box button:active {
+  transform: scale(0.98);
+  background: var(--primary-dark);
+}
+.login-box button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+#loginError {
+  color: var(--danger);
+  margin-top: 12px;
+  font-size: 13px;
+  text-align: center;
+  min-height: 18px;
+  font-weight: 500;
+}
+
+/* ============ HEADER ============ */
+header {
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  padding: calc(var(--safe-top) + 12px) 16px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: var(--shadow-sm);
+  gap: 10px;
+  min-height: var(--header-height);
+}
+header h1 {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+  display: inline-block;
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.status-dot.online {
+  background: var(--primary);
+  box-shadow: 0 0 10px var(--primary);
+  animation: pulseDot 2s infinite;
+}
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.header-right { display: flex; align-items: center; gap: 8px; }
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.icon-btn:active {
+  transform: scale(0.92);
+  background: var(--border);
+}
+
+/* ============ MAIN ============ */
+main {
+  padding: 12px;
+  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 20px);
+  max-width: 100%;
+  margin: 0 auto;
+}
+.tab-content { display: none; }
+.tab-content.active {
+  display: block;
+  animation: fadeIn 0.2s ease-in;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============ ALERT BANNER ============ */
+#alertBanner {
+  display: none;
+  background: var(--danger);
+  color: white;
+  padding: 14px 16px;
+  border-radius: 14px;
+  margin-bottom: 12px;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  animation: pulse 1.5s infinite;
+  box-shadow: var(--shadow-lg);
+}
+#alertBanner.show { display: flex; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+/* ============ CARDS ============ */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.card {
+  background: var(--card-bg);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+  border-left: 4px solid var(--primary);
+  transition: transform 0.15s;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.card:active { transform: scale(0.98); }
+.card.alert {
+  border-left-color: var(--danger);
+  background: rgba(229, 62, 62, 0.08);
+}
+.card .card-title {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card .card-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  word-break: break-all;
+}
+.card .card-unit {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 3px;
+  font-weight: 600;
+}
+
+/* CB Card (full width) */
+.status-cb-card {
+  grid-column: span 2;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+  border-left: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  min-height: 90px;
+}
+.status-cb-card.trip {
+  background: linear-gradient(135deg, var(--danger) 0%, #9b2c2c 100%);
+  animation: pulse 1.5s infinite;
+}
+.status-cb-card .cb-icon {
+  font-size: 38px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+.status-cb-card .cb-text {
+  font-size: 22px;
+  font-weight: 800;
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+}
+.status-cb-card .cb-label {
+  font-size: 10px;
+  opacity: 0.9;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+}
+
+/* ============ CHART PANEL ============ */
+.chart-panel {
+  background: var(--card-bg);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 12px;
+}
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chart-header h3 {
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Period filter - mobile friendly */
+.period-filter {
+  display: flex;
+  gap: 4px;
+  background: var(--bg);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  width: 100%;
+}
+.period-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: all 0.2s;
+  min-height: 40px;
+}
+.period-btn.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 2px 6px rgba(76,175,80,0.3);
+}
+.period-btn:active:not(.active) {
+  background: var(--card-bg);
+}
+
+/* Param chips - horizontal scroll */
+.param-chips {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.param-chips::-webkit-scrollbar { display: none; }
+.chip {
+  padding: 8px 14px;
+  border-radius: 18px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--text);
+  white-space: nowrap;
+  user-select: none;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.chip.selected {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+.chip:active { transform: scale(0.95); }
+
+/* Chart container */
+.chart-wrap {
+  position: relative;
+  height: 220px;
+  width: 100%;
+}
+.chart-info {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ============ CB TIMELINE ============ */
+.cb-legend {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.cb-legend-item { display: flex; align-items: center; gap: 5px; }
+.cb-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.cb-dot.normal { background: #4CAF50; }
+.cb-dot.trip {
+  background: #e53e3e;
+  animation: pulse 1.5s infinite;
+}
+
+.cb-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.cb-stat-item {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+}
+.cb-stat-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+.cb-stat-value {
+  font-size: 16px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.cb-stat-value.danger { color: var(--danger); }
+.cb-stat-value.success { color: var(--primary); }
+
+/* ============ SAMPLE TAB ============ */
+.sample-header {
+  background: linear-gradient(135deg, #3182ce 0%, #2c5282 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 14px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+.sample-header h2 { font-size: 18px; margin-bottom: 6px; }
+.sample-header p { font-size: 12px; opacity: 0.9; line-height: 1.5; }
+
+.sample-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.sample-card {
+  background: var(--card-bg);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+  border-top: 3px solid #3182ce;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.sample-card .sc-title {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+.sample-card .sc-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.sample-card .sc-unit {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+.sample-card .sc-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+
+.sample-placeholder {
+  background: var(--card-bg);
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  padding: 30px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+.sample-placeholder .icon {
+  font-size: 42px;
+  margin-bottom: 10px;
+  opacity: 0.5;
+}
+.sample-placeholder h3 {
+  font-size: 15px;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+.sample-placeholder p { font-size: 12px; line-height: 1.5; }
+
+/* ============ HISTORY ============ */
+.history-controls {
+  background: var(--card-bg);
+  padding: 12px;
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.history-controls input {
+  padding: 12px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 16px;
+  flex: 1;
+  min-width: 120px;
+  min-height: 46px;
+  -webkit-appearance: none;
+}
+.history-controls input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+.btn {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  transition: all 0.15s;
+  background: var(--primary);
+  color: white;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn:active { transform: scale(0.97); }
+.btn-outline {
+  background: transparent;
+  border: 2px solid var(--border);
+  color: var(--text);
+}
+.btn-outline:active { background: var(--bg); }
+
+/* ============ TABLE ============ */
+.table-wrap {
+  background: var(--card-bg);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  overflow: auto;
+  max-height: 60vh;
+  -webkit-overflow-scrolling: touch;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+th, td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+th {
+  background: var(--bg);
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+td.alert { color: var(--danger); font-weight: 700; }
+
+/* ============ SUMMARY ============ */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.summary-card {
+  background: var(--card-bg);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.summary-card h4 {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 700;
+}
+.summary-card .stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 4px 0;
+  font-variant-numeric: tabular-nums;
+}
+.summary-card .stat-label { color: var(--text-muted); }
+.summary-card .stat-value { font-weight: 700; }
+
+/* ============ BOTTOM NAV ============ */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--nav-height) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: var(--card-bg);
+  border-top: 1px solid var(--border);
+  display: flex;
+  z-index: 200;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+}
+.nav-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 8px 4px;
+  transition: color 0.2s;
+  position: relative;
+  min-height: 56px;
+}
+.nav-btn .nav-icon {
+  font-size: 22px;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+.nav-btn.active { color: var(--primary); }
+.nav-btn.active .nav-icon { transform: scale(1.1); }
+.nav-btn:active .nav-icon { transform: scale(0.9); }
+.nav-btn.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 3px;
+  background: var(--primary);
+  border-radius: 0 0 3px 3px;
+}
+
+/* ============ LOADING ============ */
+.loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.spinner {
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============ TOAST ============ */
+#toast {
+  position: fixed;
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + 16px);
+  left: 16px;
+  right: 16px;
+  background: var(--text);
+  color: var(--bg);
+  padding: 14px 16px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s;
+  z-index: 1000;
+  font-size: 13px;
+  text-align: center;
+  pointer-events: none;
+  font-weight: 600;
+}
+#toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hidden { display: none !important; }
+
+/* ============ LANDSCAPE (HP miring) ============ */
+@media (orientation: landscape) and (max-height: 500px) {
+  header { padding-top: 8px; padding-bottom: 8px; }
+  .cards-grid { grid-template-columns: repeat(4, 1fr); }
+  .chart-wrap { height: 180px; }
+  main { padding: 8px; }
+}
+
+/* ============ TABLET ============ */
+@media (min-width: 600px) and (max-width: 900px) {
+  .cards-grid { grid-template-columns: repeat(3, 1fr); }
+  .sample-grid { grid-template-columns: repeat(3, 1fr); }
+  .summary-grid { grid-template-columns: repeat(3, 1fr); }
+  .chart-wrap { height: 300px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">⚡</div>
+    <h1>ION9000</h1>
+    <p class="sub">Monitoring Dashboard</p>
+    <label for="username">Username</label>
+    <input type="text" id="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label for="password">Password</label>
+    <input type="password" id="password" autocomplete="current-password">
+    <button id="loginBtn" onclick="doLogin()">Masuk</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" class="hidden">
+  <header>
+    <h1>
+      <span class="status-dot" id="statusDot"></span>
+      ION9000
+    </h1>
+    <div class="header-right">
+      <button class="icon-btn" onclick="toggleTheme()" title="Tema">
+        <span id="themeIcon">🌙</span>
+      </button>
+      <button class="icon-btn" onclick="logout()" title="Logout">⏻</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ============ TAB MONITORING ============ -->
+    <div class="tab-content active" id="tab-monitoring">
+      <div id="alertBanner">⚠️ <span id="alertText">CB TRIP!</span></div>
+
+      <div class="cards-grid" id="cardsGrid">
+        <div class="loading" style="grid-column: 1/-1;">
+          <div class="spinner"></div>Memuat data...
+        </div>
+      </div>
+
+      <!-- Grafik Parameter -->
+      <div class="chart-panel">
+        <div class="chart-header">
+          <h3>📈 Grafik</h3>
+        </div>
+        <div class="period-filter" style="margin-bottom: 10px;">
+          <button class="period-btn active" data-period="1d" onclick="setPeriod('1d')">1 Hari</button>
+          <button class="period-btn" data-period="1w" onclick="setPeriod('1w')">1 Minggu</button>
+          <button class="period-btn" data-period="1m" onclick="setPeriod('1m')">1 Bulan</button>
+        </div>
+
+        <div class="param-chips" id="paramChips"></div>
+
+        <div class="chart-wrap">
+          <canvas id="historyChart"></canvas>
+        </div>
+        <div class="chart-info" id="chartInfo"></div>
+      </div>
+
+      <!-- Grafik CB -->
+      <div class="chart-panel">
+        <div class="chart-header">
+          <h3>⚡ Status CB</h3>
+          <span id="cbStatsHeader" style="font-size:11px;color:var(--text-muted);font-weight:700;"></span>
+        </div>
+
+        <div class="cb-legend">
+          <span class="cb-legend-item"><span class="cb-dot normal"></span>Normal</span>
+          <span class="cb-legend-item"><span class="cb-dot trip"></span>Trip</span>
+        </div>
+
+        <div class="chart-wrap" style="height: 120px;">
+          <canvas id="cbChart"></canvas>
+        </div>
+
+        <div class="cb-stats" id="cbStatsDetail"></div>
+      </div>
+    </div>
+
+    <!-- ============ TAB SAMPEL ============ -->
+    <div class="tab-content" id="tab-sample">
+      <div class="sample-header">
+        <h2>🧪 Sampel Panel</h2>
+        <p>Template kosong untuk monitoring panel listrik lain. Duplikat & sesuaikan.</p>
+      </div>
+
+      <div class="sample-grid">
+        <div class="sample-card">
+          <div class="sc-title">Voltage L1</div>
+          <div class="sc-value">0.00<span class="sc-unit">V</span></div>
+          <div class="sc-desc">Contoh</div>
+        </div>
+        <div class="sample-card">
+          <div class="sc-title">Voltage L2</div>
+          <div class="sc-value">0.00<span class="sc-unit">V</span></div>
+          <div class="sc-desc">Contoh</div>
+        </div>
+        <div class="sample-card">
+          <div class="sc-title">Current L1</div>
+          <div class="sc-value">0.00<span class="sc-unit">A</span></div>
+          <div class="sc-desc">Contoh</div>
+        </div>
+        <div class="sample-card">
+          <div class="sc-title">Power</div>
+          <div class="sc-value">0.00<span class="sc-unit">W</span></div>
+          <div class="sc-desc">Contoh</div>
+        </div>
+      </div>
+
+      <div class="sample-placeholder">
+        <div class="icon">🔌</div>
+        <h3>Panel Baru</h3>
+        <p>Tambahkan panel monitoring baru dengan menyalin struktur di atas, lalu sesuaikan parameter & unitnya.</p>
+      </div>
+    </div>
+
+    <!-- ============ TAB HISTORY ============ -->
+    <div class="tab-content" id="tab-history">
+      <div class="history-controls">
+        <input type="date" id="historyDate">
+        <button class="btn" onclick="loadHistory()">🔍 Muat</button>
+        <button class="btn btn-outline" onclick="exportCSV()">📥 CSV</button>
+      </div>
+      <div class="history-controls" style="padding: 10px;">
+        <input type="text" id="historySearch" placeholder="🔍 Cari nilai..." style="width: 100%;">
+      </div>
+      <div id="historyInfo" style="margin-bottom: 10px; color: var(--text-muted); font-size: 12px; padding: 0 4px;"></div>
+      <div class="table-wrap">
+        <table id="historyTable">
+          <thead></thead>
+          <tbody><tr><td class="loading" colspan="2"><div class="spinner"></div>Pilih tanggal & klik Muat</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ TAB SUMMARY ============ -->
+    <div class="tab-content" id="tab-summary">
+      <div class="history-controls">
+        <input type="date" id="summaryDate">
+        <button class="btn" onclick="loadSummary()">📊 Muat Ringkasan</button>
+      </div>
+      <div id="summaryContent" class="summary-grid">
+        <div class="loading" style="grid-column: 1/-1;">
+          <div class="spinner"></div>Pilih tanggal
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============ BOTTOM NAV ============ -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="monitoring" onclick="switchTab('monitoring')">
+      <span class="nav-icon">📊</span>Monitor
+    </button>
+    <button class="nav-btn" data-tab="sample" onclick="switchTab('sample')">
+      <span class="nav-icon">🧪</span>Sampel
+    </button>
+    <button class="nav-btn" data-tab="history" onclick="switchTab('history')">
+      <span class="nav-icon">📅</span>Histori
+    </button>
+    <button class="nav-btn" data-tab="summary" onclick="switchTab('summary')">
+      <span class="nav-icon">📋</span>Ringkas
+    </button>
+  </nav>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============ KONFIG ============ */
+const API_URL = "https://script.google.com/macros/s/AKfycbxAFAVCym991JDn6hsSyCQj0M1dve1r-QtJbdN4s0e2NFic328ULlXGPfRFV04Zow_GKQ/exec";
+const REFRESH_INTERVAL_MS = 15000; // mobile lebih hemat: 15 detik
+const CB_REFRESH_INTERVAL_MS = 60000;
+
+/* ============ STATE ============ */
+let authToken = null;
+let currentUser = null;
+let refreshTimer = null;
+let historyChart = null;
+let cbChart = null;
+let currentPeriod = '1d';
+let selectedParams = new Set();
+let historyData = [];
+let lastCbRefresh = 0;
+
+const COLORS = [
+  '#4CAF50', '#3182ce', '#ed8936', '#e53e3e', '#805ad5',
+  '#38b2ac', '#d69e2e', '#dd6b20', '#319795', '#b83280'
+];
+
+/* ============ LOGIN ============ */
+async function doLogin() {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+
+  errEl.textContent = '';
+  if (!username || !password) {
+    errEl.textContent = 'Isi username & password';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Memproses...';
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'login', username, password })
+    });
+    const result = await res.json();
+
+    if (result.status !== 'success' || !result.token) {
+      errEl.textContent = result.message || 'Login gagal';
+      btn.disabled = false;
+      btn.textContent = 'Masuk';
+      return;
+    }
+
+    authToken = result.token;
+    currentUser = result.user;
+    localStorage.setItem('auth_token', authToken);
+    localStorage.setItem('auth_user', currentUser);
+    localStorage.setItem('auth_expires', result.expires);
+    showApp();
+  } catch (err) {
+    errEl.textContent = 'Error: ' + err.message;
+    btn.disabled = false;
+    btn.textContent = 'Masuk';
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !document.getElementById('loginScreen').classList.contains('hidden')) {
+    doLogin();
+  }
+});
+
+function showApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  initApp();
+}
+
+function logout() {
+  if (!confirm('Yakin logout?')) return;
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_user');
+  localStorage.removeItem('auth_expires');
+  if (refreshTimer) clearInterval(refreshTimer);
+  location.reload();
+}
+
+window.addEventListener('load', () => {
+  const token = localStorage.getItem('auth_token');
+  const user = localStorage.getItem('auth_user');
+  const expires = parseInt(localStorage.getItem('auth_expires') || '0');
+  if (token && user && expires > Date.now()) {
+    authToken = token;
+    currentUser = user;
+    showApp();
+  } else {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('auth_expires');
+  }
+});
+
+/* ============ INIT ============ */
+function initApp() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('historyDate').value = today;
+  document.getElementById('summaryDate').value = today;
+
+  loadRealtime();
+  loadParamChips();
+  loadCbTimeline();
+  lastCbRefresh = Date.now();
+
+  refreshTimer = setInterval(() => {
+    if (document.querySelector('.tab-content.active').id === 'tab-monitoring') {
+      loadRealtime();
+      if (Date.now() - lastCbRefresh > CB_REFRESH_INTERVAL_MS) {
+        lastCbRefresh = Date.now();
+        loadCbTimeline();
+      }
+    }
+  }, REFRESH_INTERVAL_MS);
+
+  initSwipe();
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.nav-btn').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  if (name === 'monitoring') {
+    loadRealtime();
+    if (Date.now() - lastCbRefresh > CB_REFRESH_INTERVAL_MS) {
+      lastCbRefresh = Date.now();
+      loadCbTimeline();
+    }
+  }
+}
+
+/* ============ SWIPE NAVIGATION ============ */
+function initSwipe() {
+  const tabs = ['monitoring', 'sample', 'history', 'summary'];
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  let touchTarget = null;
+
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchStartTime = Date.now();
+    touchTarget = e.target;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (!touchTarget) return;
+    if (touchTarget.closest('input, textarea, select, button, .chip, .period-btn, .table-wrap, .param-chips')) {
+      touchTarget = null;
+      return;
+    }
+
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    const dt = Date.now() - touchStartTime;
+
+    // Horizontal swipe only, must be fast enough
+    if (Math.abs(dx) < 80 || Math.abs(dy) > Math.abs(dx) || dt > 500) {
+      touchTarget = null;
+      return;
+    }
+
+    const currentTab = document.querySelector('.tab-content.active').id.replace('tab-', '');
+    const idx = tabs.indexOf(currentTab);
+    if (idx === -1) { touchTarget = null; return; }
+
+    if (dx < 0 && idx < tabs.length - 1) {
+      // Swipe left → next tab
+      switchTab(tabs[idx + 1]);
+    } else if (dx > 0 && idx > 0) {
+      // Swipe right → prev tab
+      switchTab(tabs[idx - 1]);
+    }
+    touchTarget = null;
+  }, { passive: true });
+}
+
+/* ============ API ============ */
+async function apiCall(action, params = {}) {
+  const url = new URL(API_URL);
+  url.searchParams.set('action', action);
+  url.searchParams.set('token', authToken);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+
+  const res = await fetch(url.toString());
+  if (res.status === 401) {
+    showToast('Sesi habis, login ulang');
+    setTimeout(logout, 1500);
+    throw new Error('Unauthorized');
+  }
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return await res.json();
+}
+
+/* ============ REALTIME ============ */
+async function loadRealtime() {
+  try {
+    const result = await apiCall('realtime');
+    document.getElementById('statusDot').classList.add('online');
+    if (!result.data) {
+      document.getElementById('cardsGrid').innerHTML =
+        '<div class="loading" style="grid-column:1/-1;">Belum ada data</div>';
+      return;
+    }
+    renderCards(result.data);
+    checkCBAlert(result.data.cb_status);
+  } catch (err) {
+    document.getElementById('statusDot').classList.remove('online');
+  }
+}
+
+function renderCards(data) {
+  const grid = document.getElementById('cardsGrid');
+  const cbStatus = parseInt(data.cb_status);
+  const units = getUnits();
+  let html = `
+    <div class="status-cb-card ${cbStatus === 0 ? 'trip' : ''}">
+      <div>
+        <div class="cb-label">Status CB</div>
+        <div class="cb-text">${cbStatus === 0 ? 'TRIP' : 'NORMAL'}</div>
+      </div>
+      <div class="cb-icon">${cbStatus === 0 ? '⚠️' : '✅'}</div>
+    </div>
+  `;
+
+  if (data.daily_usage_kwh !== undefined) {
+    html += `
+      <div class="card">
+        <div class="card-title">Daya Hari Ini</div>
+        <div class="card-value">${formatNumber(data.daily_usage_kwh)}<span class="card-unit">kWh</span></div>
+      </div>
+    `;
+  }
+
+  Object.keys(data).forEach(key => {
+    if (key === 'timestamp' || key === 'cb_status' || key === 'daily_usage_kwh') return;
+    const value = data[key];
+    const unit = units[key] || '';
+    const numVal = parseFloat(value);
+    const isAlert = key.toLowerCase().includes('thd') && numVal > 5;
+    html += `
+      <div class="card ${isAlert ? 'alert' : ''}">
+        <div class="card-title" title="${key}">${key}</div>
+        <div class="card-value">${formatNumber(value)}<span class="card-unit">${unit}</span></div>
+      </div>
+    `;
+  });
+
+  grid.innerHTML = html;
+}
+
+function checkCBAlert(cbStatus) {
+  const banner = document.getElementById('alertBanner');
+  if (parseInt(cbStatus) === 0) {
+    banner.classList.add('show');
+    document.getElementById('alertText').textContent = 'CB TRIP! Periksa panel.';
+    if (Notification.permission === 'granted') {
+      new Notification('⚠️ CB TRIP', { body: 'Circuit Breaker dalam kondisi TRIP!' });
+    }
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+/* ============ PARAM CHIPS ============ */
+async function loadParamChips() {
+  try {
+    const result = await apiCall('realtime');
+    if (!result.data) return;
+    const container = document.getElementById('paramChips');
+    container.innerHTML = '';
+    Object.keys(result.data).forEach(key => {
+      if (key === 'timestamp' || key === 'cb_status') return;
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.textContent = key;
+      chip.dataset.param = key;
+      chip.onclick = () => toggleParam(key);
+      container.appendChild(chip);
+    });
+  } catch (err) {}
+}
+
+function toggleParam(param) {
+  if (selectedParams.has(param)) {
+    selectedParams.delete(param);
+  } else {
+    if (selectedParams.size >= 4) {
+      showToast('Maksimal 4 parameter');
+      return;
+    }
+    selectedParams.add(param);
+  }
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.classList.toggle('selected', selectedParams.has(chip.dataset.param));
+  });
+  if (selectedParams.size > 0) loadHistoryChart();
+  else if (historyChart) { historyChart.destroy(); historyChart = null; }
+}
+
+/* ============ PERIOD ============ */
+function setPeriod(period) {
+  currentPeriod = period;
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.period === period);
+  });
+  if (selectedParams.size > 0) loadHistoryChart();
+  loadCbTimeline();
+  lastCbRefresh = Date.now();
+}
+
+/* ============ CHART PARAMETER ============ */
+async function loadHistoryChart() {
+  if (selectedParams.size === 0) return;
+
+  const ctx = document.getElementById('historyChart').getContext('2d');
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const textColor = isDark ? '#f7fafc' : '#1a202c';
+  const gridColor = isDark ? '#2d3748' : '#e2e8f0';
+
+  document.getElementById('chartInfo').textContent = 'Memuat...';
+
+  const datasets = [];
+  let i = 0;
+  let totalPoints = 0;
+
+  for (const param of selectedParams) {
+    try {
+      const result = await apiCall('chart', { period: currentPeriod, param: param });
+      if (result.status === 'success' && result.data.length > 0) {
+        datasets.push({
+          label: param,
+          data: result.data.map(d => ({ x: d.t, y: d.avg })),
+          borderColor: COLORS[i % COLORS.length],
+          backgroundColor: COLORS[i % COLORS.length] + '20',
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          fill: false,
+          spanGaps: true
+        });
+        totalPoints += result.data.length;
+        i++;
+      }
+    } catch (err) {
+      console.warn('Chart error for ' + param + ':', err);
+    }
+  }
+
+  if (historyChart) historyChart.destroy();
+
+  if (datasets.length === 0) {
+    document.getElementById('chartInfo').textContent = 'Tidak ada data';
+    return;
+  }
+
+  historyChart = new Chart(ctx, {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      animation: { duration: 200 },
+      plugins: {
+        legend: {
+          labels: {
+            color: textColor,
+            boxWidth: 10,
+            font: { size: 10 },
+            padding: 8,
+            usePointStyle: true
+          }
+        },
+        tooltip: {
+          titleFont: { size: 11 },
+          bodyFont: { size: 11 },
+          callbacks: {
+            title: (items) => {
+              const d = new Date(items[0].parsed.x);
+              return d.toLocaleString('id-ID', {
+                day: '2-digit', month: 'short',
+                hour: '2-digit', minute: '2-digit'
+              });
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            displayFormats: {
+              second: 'HH:mm', minute: 'HH:mm', hour: 'HH:mm',
+              day: 'dd/MM', week: 'dd/MM', month: 'MMM'
+            }
+          },
+          ticks: {
+            color: textColor,
+            maxTicksLimit: 5,
+            font: { size: 10 }
+          },
+          grid: { color: gridColor, drawBorder: false }
+        },
+        y: {
+          ticks: {
+            color: textColor,
+            maxTicksLimit: 5,
+            font: { size: 10 }
+          },
+          grid: { color: gridColor, drawBorder: false }
+        }
+      }
+    }
+  });
+
+  const periodLabel = currentPeriod === '1d' ? '1 Hari' : currentPeriod === '1w' ? '1 Minggu' : '1 Bulan';
+  document.getElementById('chartInfo').innerHTML = `
+    <span>📊 ${periodLabel} • ${totalPoints} titik</span>
+  `;
+}
+
+/* ============ CB TIMELINE ============ */
+async function loadCbTimeline() {
+  try {
+    const result = await apiCall('cb_timeline', { period: currentPeriod });
+    if (result.status !== 'success') {
+      document.getElementById('cbStatsDetail').innerHTML =
+        '<div style="color:var(--text-muted);font-size:11px;grid-column:1/-1;">Gagal memuat CB</div>';
+      return;
+    }
+    renderCbChart(result.data || []);
+    renderCbStats(result.stats || {});
+  } catch (err) {
+    console.error('CB timeline error:', err);
+  }
+}
+
+function renderCbChart(timeline) {
+  const ctx = document.getElementById('cbChart').getContext('2d');
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const textColor = isDark ? '#f7fafc' : '#1a202c';
+  const gridColor = isDark ? '#2d3748' : '#e2e8f0';
+
+  if (cbChart) cbChart.destroy();
+
+  if (!timeline || timeline.length === 0) {
+    cbChart = new Chart(ctx, {
+      type: 'line',
+      data: { datasets: [] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: {
+            display: true,
+            text: 'Tidak ada data',
+            color: textColor,
+            font: { size: 11 }
+          }
+        },
+        scales: {
+          x: { type: 'time', ticks: { color: textColor, font: { size: 9 } }, grid: { color: gridColor } },
+          y: { ticks: { color: textColor, font: { size: 9 } }, grid: { color: gridColor }, min: -0.2, max: 1.2 }
+        }
+      }
+    });
+    return;
+  }
+
+  const data = timeline.map(p => ({ x: p.t, y: p.s }));
+
+  cbChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'Status CB',
+        data: data,
+        borderColor: function(context) {
+          const idx = context.dataIndex;
+          if (idx < data.length) return data[idx].y === 0 ? '#e53e3e' : '#4CAF50';
+          return '#4CAF50';
+        },
+        backgroundColor: 'rgba(76,175,80,0.1)',
+        borderWidth: 2,
+        stepped: 'after',
+        pointRadius: function(context) {
+          const idx = context.dataIndex;
+          return data[idx].y === 0 ? 4 : 0;
+        },
+        pointBackgroundColor: function(context) {
+          const idx = context.dataIndex;
+          return data[idx].y === 0 ? '#e53e3e' : '#4CAF50';
+        },
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1.5,
+        fill: true,
+        spanGaps: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      animation: { duration: 200 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          titleFont: { size: 10 },
+          bodyFont: { size: 10 },
+          callbacks: {
+            title: (items) => {
+              const d = new Date(items[0].parsed.x);
+              return d.toLocaleString('id-ID', {
+                day: '2-digit', month: 'short',
+                hour: '2-digit', minute: '2-digit'
+              });
+            },
+            label: (item) => item.parsed.y === 1 ? '✅ Normal' : '⚠️ TRIP'
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            displayFormats: {
+              second: 'HH:mm', minute: 'HH:mm', hour: 'HH:mm',
+              day: 'dd/MM', month: 'MMM'
+            }
+          },
+          ticks: { color: textColor, maxTicksLimit: 4, font: { size: 9 } },
+          grid: { color: gridColor }
+        },
+        y: {
+          min: -0.2, max: 1.2,
+          ticks: {
+            color: textColor, stepSize: 1,
+            font: { size: 9 },
+            callback: v => v === 1 ? 'OK' : v === 0 ? 'Trip' : ''
+          },
+          grid: { color: gridColor }
+        }
+      }
+    }
+  });
+}
+
+function renderCbStats(stats) {
+  const container = document.getElementById('cbStatsDetail');
+  const header = document.getElementById('cbStatsHeader');
+
+  const tripCount = stats.tripCount || 0;
+  const tripMin = stats.tripDurationMin || 0;
+
+  if (tripCount > 0) {
+    header.innerHTML = `<span style="color:var(--danger);">⚠️ ${tripCount} trip</span>`;
+  } else {
+    header.innerHTML = `<span style="color:var(--primary);">✅ 0 trip</span>`;
+  }
+
+  let durationText = '-';
+  if (tripMin > 0) {
+    if (tripMin < 60) durationText = tripMin + ' mnt';
+    else {
+      const h = Math.floor(tripMin / 60);
+      const m = tripMin % 60;
+      durationText = h + 'j ' + m + 'm';
+    }
+  }
+
+  container.innerHTML = `
+    <div class="cb-stat-item">
+      <div class="cb-stat-label">Trip</div>
+      <div class="cb-stat-value ${tripCount > 0 ? 'danger' : 'success'}">${tripCount}×</div>
+    </div>
+    <div class="cb-stat-item">
+      <div class="cb-stat-label">Durasi</div>
+      <div class="cb-stat-value ${tripMin > 0 ? 'danger' : 'success'}">${durationText}</div>
+    </div>
+  `;
+}
+
+/* ============ HISTORY ============ */
+async function loadHistory() {
+  const date = document.getElementById('historyDate').value;
+  if (!date) { showToast('Pilih tanggal'); return; }
+  const tbody = document.querySelector('#historyTable tbody');
+  tbody.innerHTML = '<tr><td class="loading" colspan="2"><div class="spinner"></div>Memuat...</td></tr>';
+
+  try {
+    const result = await apiCall('history', { date });
+    historyData = result.data || [];
+    if (historyData.length === 0) {
+      tbody.innerHTML = '<tr><td class="loading" colspan="2">Tidak ada data</td></tr>';
+      document.getElementById('historyInfo').textContent = '';
+      return;
+    }
+    document.getElementById('historyInfo').textContent = `${historyData.length} baris • ${date}`;
+    renderHistoryTable(historyData);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td class="loading" colspan="2">Error: ${err.message}</td></tr>`;
+  }
+}
+
+function renderHistoryTable(data) {
+  if (data.length === 0) return;
+  const headers = Object.keys(data[0]);
+  const thead = document.querySelector('#historyTable thead');
+  const tbody = document.querySelector('#historyTable tbody');
+  thead.innerHTML = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+
+  const search = (document.getElementById('historySearch').value || '').toLowerCase();
+  const filtered = search ? data.filter(row => headers.some(h => String(row[h]).toLowerCase().includes(search))) : data;
+  const limited = filtered.slice(0, 200);
+
+  tbody.innerHTML = limited.map(row => {
+    return '<tr>' + headers.map(h => {
+      let val = row[h];
+      if (h === 'cb_status' && parseInt(val) === 0) return `<td class="alert">${val} TRIP</td>`;
+      return `<td>${typeof val === 'number' ? val.toFixed(2) : val}</td>`;
+    }).join('') + '</tr>';
+  }).join('');
+
+  if (filtered.length > 200) {
+    tbody.innerHTML += `<tr><td colspan="${headers.length}" style="text-align:center;color:var(--text-muted);font-size:11px;">... ${filtered.length - 200} baris lainnya</td></tr>`;
+  }
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'historySearch' && historyData.length > 0) renderHistoryTable(historyData);
+});
+
+/* ============ EXPORT CSV ============ */
+function exportCSV() {
+  if (historyData.length === 0) { showToast('Tidak ada data'); return; }
+  const headers = Object.keys(historyData[0]);
+  const rows = historyData.map(row => headers.map(h => {
+    let v = row[h];
+    if (typeof v === 'string' && (v.includes(',') || v.includes('"'))) v = '"' + v.replace(/"/g, '""') + '"';
+    return v;
+  }).join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ION9000_${document.getElementById('historyDate').value}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV ter-download');
+}
+
+/* ============ SUMMARY ============ */
+async function loadSummary() {
+  const date = document.getElementById('summaryDate').value;
+  if (!date) { showToast('Pilih tanggal'); return; }
+  const content = document.getElementById('summaryContent');
+  content.innerHTML = '<div class="loading" style="grid-column:1/-1;"><div class="spinner"></div>Memuat...</div>';
+  try {
+    const result = await apiCall('daily_summary', { date });
+    if (!result.data) {
+      content.innerHTML = '<div class="loading" style="grid-column:1/-1;">Tidak ada data</div>';
+      return;
+    }
+    let html = '';
+    Object.entries(result.data).forEach(([param, stats]) => {
+      html += `
+        <div class="summary-card">
+          <h4>${param}</h4>
+          <div class="stat"><span class="stat-label">Min</span><span class="stat-value">${formatNumber(stats.min)}</span></div>
+          <div class="stat"><span class="stat-label">Max</span><span class="stat-value">${formatNumber(stats.max)}</span></div>
+          <div class="stat"><span class="stat-label">Avg</span><span class="stat-value">${formatNumber(stats.avg)}</span></div>
+        </div>
+      `;
+    });
+    content.innerHTML = html;
+  } catch (err) {
+    content.innerHTML = `<div class="loading" style="grid-column:1/-1;">Error: ${err.message}</div>`;
+  }
+}
+
+/* ============ THEME ============ */
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  document.getElementById('themeIcon').textContent = next === 'dark' ? '☀️' : '🌙';
+  localStorage.setItem('theme', next);
+  if (historyChart) loadHistoryChart();
+  if (cbChart) loadCbTimeline();
+}
+
+(function() {
+  const saved = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  const icon = document.getElementById('themeIcon');
+  if (icon) icon.textContent = saved === 'dark' ? '☀️' : '🌙';
+})();
+
+/* ============ UTIL ============ */
+function formatNumber(v) {
+  if (v === null || v === undefined || v === '') return '-';
+  const n = parseFloat(v);
+  if (isNaN(n)) return v;
+  return n.toFixed(2);
+}
+
+function getUnits() {
+  return {
+    'Current A':'A','Current B':'A','Current C':'A','Current N':'A','Current G':'A','Current Avg':'A',
+    'Voltage A-B':'V','Voltage B-C':'V','Voltage C-A':'V','Voltage L-L Avg':'V',
+    'Active Power Total':'W','Reactive Power Total':'VAR','Apparent Power Total':'VA',
+    'Frequency':'Hz','power factor':'PF',
+    'THD Current A':'%','THD Current B':'%','THD Current C':'%','THD Current N':'%','THD Current G':'%',
+    'THD Voltage A-N':'%','THD Voltage B-N':'%','THD Voltage C-N':'%','THD Voltage 4-N':'%',
+    'TDD Current A 10 Minute':'%','TDD Current B 10 Minute':'%','TDD Current C 10 Minute':'%',
+    'Active Energy Delivered (Into Load)':'kWh',
+    'reactive Energy Delivered (Into Load)':'VARh',
+    'apparent Energy Delivered (Into Load)':'VAh',
+    'Active Energy Received (Out of Load)':'kWh',
+    'Active Power Total Last Demand':'W',
+    'Reactive Power Total Last Demand':'VAR',
+    'Apparent Power Total Last Demand':'VA',
+    'daily_usage_kwh':'kWh'
+  };
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+</script>
+</body>
+</html>
