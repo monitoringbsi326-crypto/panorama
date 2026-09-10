@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ION9000 Monitoring Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #f5f7fa; --card-bg: #ffffff; --text: #1a202c; --text-muted: #718096;
+  --border: #e2e8f0; --primary: #4CAF50; --primary-hover: #45a049;
+  --danger: #e53e3e; --warning: #ed8936; --info: #3182ce;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08); --shadow-lg: 0 4px 12px rgba(0,0,0,0.12);
+}
+[data-theme="dark"] {
+  --bg: #1a202c; --card-bg: #2d3748; --text: #f7fafc; --text-muted: #a0aec0;
+  --border: #4a5568; --shadow: 0 1px 3px rgba(0,0,0,0.3); --shadow-lg: 0 4px 12px rgba(0,0,0,0.5);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
+}
+
+/* LOGIN */
+#loginScreen {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; padding: 20px;
+}
+.login-box {
+  background: var(--card-bg); padding: 40px; border-radius: 12px;
+  box-shadow: var(--shadow-lg); width: 100%; max-width: 380px;
+}
+.login-box h1 { margin-bottom: 8px; color: var(--primary); font-size: 24px; text-align: center; }
+.login-box p { color: var(--text-muted); margin-bottom: 25px; text-align: center; font-size: 14px; }
+.login-box label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; }
+.login-box input {
+  width: 100%; padding: 11px 14px; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 14px; margin-bottom: 16px;
+  background: var(--bg); color: var(--text);
+}
+.login-box input:focus { outline: none; border-color: var(--primary); }
+.login-box button {
+  width: 100%; padding: 12px; background: var(--primary); color: white;
+  border: none; border-radius: 8px; font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: background 0.2s;
+}
+.login-box button:hover { background: var(--primary-hover); }
+.login-box button:disabled { opacity: 0.6; cursor: not-allowed; }
+#loginError {
+  color: var(--danger); margin-top: 12px; font-size: 13px;
+  text-align: center; min-height: 18px;
+}
+
+/* HEADER */
+header {
+  background: var(--card-bg); border-bottom: 1px solid var(--border);
+  padding: 12px 20px; display: flex; justify-content: space-between;
+  align-items: center; position: sticky; top: 0; z-index: 100;
+  box-shadow: var(--shadow); flex-wrap: wrap; gap: 10px;
+}
+header h1 { font-size: 18px; display: flex; align-items: center; gap: 8px; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); display: inline-block; }
+.status-dot.online { background: var(--primary); box-shadow: 0 0 8px var(--primary); }
+.header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.user-info { font-size: 13px; color: var(--text-muted); }
+
+.btn {
+  padding: 7px 14px; border: none; border-radius: 6px; cursor: pointer;
+  font-size: 13px; font-weight: 500; transition: all 0.2s;
+  background: var(--primary); color: white;
+}
+.btn:hover { background: var(--primary-hover); }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-outline:hover { background: var(--border); }
+
+/* TABS */
+.tabs {
+  display: flex; gap: 4px; padding: 12px 20px 0;
+  background: var(--card-bg); border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.tab {
+  padding: 10px 18px; border: none; background: transparent;
+  color: var(--text-muted); cursor: pointer; border-radius: 6px 6px 0 0;
+  font-size: 14px; font-weight: 500; white-space: nowrap;
+  border-bottom: 3px solid transparent;
+}
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.tab:hover:not(.active) { background: var(--bg); }
+
+/* MAIN */
+main { padding: 20px; max-width: 1600px; margin: 0 auto; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ALERT */
+#alertBanner {
+  display: none; background: var(--danger); color: white;
+  padding: 14px 20px; border-radius: 8px; margin-bottom: 20px;
+  align-items: center; gap: 12px; font-weight: 600;
+  animation: pulse 1.5s infinite; box-shadow: var(--shadow-lg);
+}
+#alertBanner.show { display: flex; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.75;} }
+
+/* CARDS */
+.cards-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.card {
+  background: var(--card-bg); border-radius: 8px; padding: 14px;
+  box-shadow: var(--shadow); transition: all 0.2s;
+  border-left: 4px solid var(--primary); position: relative;
+}
+.card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+.card.alert { border-left-color: var(--danger); background: rgba(229,62,62,0.1); }
+.card .card-title {
+  font-size: 11px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.card .card-value {
+  font-size: 22px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.card .card-unit { font-size: 12px; color: var(--text-muted); margin-left: 4px; font-weight: 500; }
+
+.status-cb-card {
+  grid-column: span 2;
+  background: linear-gradient(135deg, var(--primary) 0%, #2f855a 100%);
+  color: white; border-left: none; display: flex;
+  align-items: center; justify-content: space-between; padding: 20px;
+}
+.status-cb-card.trip {
+  background: linear-gradient(135deg, var(--danger) 0%, #9b2c2c 100%);
+  animation: pulse 1.5s infinite;
+}
+.status-cb-card .cb-icon { font-size: 36px; }
+.status-cb-card .cb-text { font-size: 24px; font-weight: 700; }
+.status-cb-card .cb-label { font-size: 12px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; }
+
+/* CHART */
+.chart-container {
+  background: var(--card-bg); border-radius: 8px; padding: 20px;
+  box-shadow: var(--shadow); margin-bottom: 20px; height: 450px;
+}
+.chart-controls {
+  display: flex; gap: 10px; margin-bottom: 16px;
+  flex-wrap: wrap; align-items: center;
+}
+.chart-controls select {
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--card-bg); color: var(--text); font-size: 13px; min-width: 200px;
+}
+
+/* HISTORY */
+.history-controls {
+  background: var(--card-bg); padding: 16px; border-radius: 8px;
+  box-shadow: var(--shadow); margin-bottom: 20px;
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+}
+.history-controls input {
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--card-bg); color: var(--text); font-size: 13px;
+}
+
+/* TABLE */
+.table-wrap {
+  background: var(--card-bg); border-radius: 8px;
+  box-shadow: var(--shadow); overflow: auto; max-height: 500px;
+}
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td {
+  padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border);
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+th {
+  background: var(--bg); font-weight: 600; position: sticky; top: 0;
+  z-index: 2; font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-muted);
+}
+tr:hover td { background: var(--bg); }
+td.alert { color: var(--danger); font-weight: 600; }
+
+/* SUMMARY */
+.summary-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;
+}
+.summary-card {
+  background: var(--card-bg); border-radius: 8px; padding: 14px; box-shadow: var(--shadow);
+}
+.summary-card h4 {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 10px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.summary-card .stat {
+  display: flex; justify-content: space-between; font-size: 13px;
+  padding: 3px 0; font-variant-numeric: tabular-nums;
+}
+.summary-card .stat-label { color: var(--text-muted); }
+.summary-card .stat-value { font-weight: 600; }
+
+/* LOADING */
+.loading { text-align: center; padding: 40px; color: var(--text-muted); }
+.spinner {
+  border: 3px solid var(--border); border-top-color: var(--primary);
+  border-radius: 50%; width: 30px; height: 30px;
+  animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* TOAST */
+#toast {
+  position: fixed; bottom: 20px; right: 20px; background: var(--text);
+  color: var(--bg); padding: 12px 20px; border-radius: 8px;
+  box-shadow: var(--shadow-lg); opacity: 0; transform: translateY(20px);
+  transition: all 0.3s; z-index: 1000; font-size: 14px; max-width: 300px;
+}
+#toast.show { opacity: 1; transform: translateY(0); }
+
+.hidden { display: none !important; }
+
+@media (max-width: 768px) {
+  main { padding: 12px; }
+  header { padding: 10px 12px; }
+  header h1 { font-size: 15px; }
+  .cards-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .card { padding: 10px; }
+  .card .card-value { font-size: 18px; }
+  .status-cb-card { grid-column: span 2; padding: 16px; }
+  .status-cb-card .cb-text { font-size: 18px; }
+  .chart-container { height: 320px; padding: 12px; }
+  .user-info { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <h1>⚡ ION9000 Monitor</h1>
+    <p>Silakan login untuk melanjutkan</p>
+    <label for="username">Username</label>
+    <input type="text" id="username" autocomplete="username" autofocus>
+    <label for="password">Password</label>
+    <input type="password" id="password" autocomplete="current-password">
+    <button id="loginBtn" onclick="doLogin()">Login</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header>
+    <h1><span class="status-dot" id="statusDot"></span> ION9000 Monitoring</h1>
+    <div class="header-right">
+      <div class="user-info">👤 <span id="userName"></span></div>
+      <button class="btn btn-outline" onclick="toggleTheme()"><span id="themeIcon">🌙</span></button>
+      <button class="btn btn-outline" onclick="logout()">Logout</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="realtime">📊 Realtime</button>
+    <button class="tab" data-tab="history">📅 Histori</button>
+    <button class="tab" data-tab="summary">📈 Ringkasan</button>
+  </div>
+
+  <main>
+    <div class="tab-content active" id="tab-realtime">
+      <div id="alertBanner">⚠️ <span id="alertText">CB TRIP TERDETEKSI!</span></div>
+      <div class="cards-grid" id="cardsGrid">
+        <div class="loading"><div class="spinner"></div>Memuat data...</div>
+      </div>
+      <div class="chart-controls">
+        <select id="chartParamSelect">
+          <option value="">-- Pilih parameter untuk grafik --</option>
+        </select>
+        <button class="btn" onclick="loadChartData()">Tampilkan</button>
+        <button class="btn btn-outline" onclick="clearChart()">Reset</button>
+      </div>
+      <div class="chart-container"><canvas id="realtimeChart"></canvas></div>
+    </div>
+
+    <div class="tab-content" id="tab-history">
+      <div class="history-controls">
+        <input type="date" id="historyDate">
+        <input type="text" id="historySearch" placeholder="🔍 Cari nilai..." style="flex: 1; min-width: 150px;">
+        <button class="btn" onclick="loadHistory()">Muat</button>
+        <button class="btn btn-outline" onclick="exportCSV()">📥 Export CSV</button>
+      </div>
+      <div id="historyInfo" style="margin-bottom: 12px; color: var(--text-muted); font-size: 13px;"></div>
+      <div class="table-wrap">
+        <table id="historyTable">
+          <thead></thead>
+          <tbody><tr><td class="loading"><div class="spinner"></div>Pilih tanggal & klik Muat</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-summary">
+      <div class="history-controls">
+        <input type="date" id="summaryDate">
+        <button class="btn" onclick="loadSummary()">Muat Ringkasan</button>
+      </div>
+      <div id="summaryContent" class="summary-grid">
+        <div class="loading" style="grid-column: 1/-1;">
+          <div class="spinner"></div>Pilih tanggal untuk melihat ringkasan
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============ KONFIGURASI ============ */
+const API_URL = "https://script.google.com/macros/s/AKfycbxAFAVCym991JDn6hsSyCQj0M1dve1r-QtJbdN4s0e2NFic328ULlXGPfRFV04Zow_GKQ/exec";
+const REFRESH_INTERVAL_MS = 10000;
+
+/* ============ STATE ============ */
+let authToken = null;
+let currentUser = null;
+let refreshTimer = null;
+let chart = null;
+let chartData = { labels: [], values: [] };
+let selectedParam = null;
+let historyData = [];
+const CHART_MAX_POINTS = 60;
+
+/* ============ LOGIN ============ */
+async function doLogin() {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+
+  errEl.textContent = '';
+  if (!username || !password) {
+    errEl.textContent = 'Isi username & password';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Memproses...';
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'login', username, password })
+    });
+    const result = await res.json();
+
+    if (result.status !== 'success' || !result.token) {
+      errEl.textContent = result.message || 'Login gagal';
+      btn.disabled = false;
+      btn.textContent = 'Login';
+      return;
+    }
+
+    // Simpan token
+    authToken = result.token;
+    currentUser = result.user;
+    localStorage.setItem('auth_token', authToken);
+    localStorage.setItem('auth_user', currentUser);
+    localStorage.setItem('auth_expires', result.expires);
+
+    showApp();
+  } catch (err) {
+    errEl.textContent = 'Error: ' + err.message;
+    btn.disabled = false;
+    btn.textContent = 'Login';
+  }
+}
+
+// Enter key untuk submit login
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !document.getElementById('loginScreen').classList.contains('hidden')) {
+    doLogin();
+  }
+});
+
+function showApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('userName').textContent = currentUser;
+  initApp();
+}
+
+function logout() {
+  // Optional: kirim request logout ke server
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_user');
+  localStorage.removeItem('auth_expires');
+  if (refreshTimer) clearInterval(refreshTimer);
+  location.reload();
+}
+
+// Auto-login kalau token masih valid
+window.addEventListener('load', () => {
+  const token = localStorage.getItem('auth_token');
+  const user = localStorage.getItem('auth_user');
+  const expires = parseInt(localStorage.getItem('auth_expires') || '0');
+
+  if (token && user && expires > Date.now()) {
+    authToken = token;
+    currentUser = user;
+    showApp();
+  } else {
+    // Bersihkan token expired
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('auth_expires');
+  }
+});
+
+/* ============ INIT ============ */
+function initApp() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('historyDate').value = today;
+  document.getElementById('summaryDate').value = today;
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+  });
+
+  loadRealtime();
+  loadChartParams();
+
+  refreshTimer = setInterval(() => {
+    if (document.querySelector('.tab.active').dataset.tab === 'realtime') {
+      loadRealtime();
+    }
+  }, REFRESH_INTERVAL_MS);
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
+}
+
+/* ============ API ============ */
+async function apiCall(action, params = {}) {
+  const url = new URL(API_URL);
+  url.searchParams.set('action', action);
+  url.searchParams.set('token', authToken);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+
+  const res = await fetch(url.toString());
+  if (res.status === 401) {
+    showToast('Sesi habis, silakan login ulang');
+    setTimeout(logout, 1500);
+    throw new Error('Unauthorized');
+  }
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return await res.json();
+}
+
+/* ============ REALTIME ============ */
+async function loadRealtime() {
+  try {
+    const result = await apiCall('realtime');
+    document.getElementById('statusDot').classList.add('online');
+    if (!result.data) {
+      document.getElementById('cardsGrid').innerHTML = '<div class="loading">Belum ada data. Menunggu kiriman dari ESP32...</div>';
+      return;
+    }
+    renderCards(result.data);
+    checkCBAlert(result.data.cb_status);
+    pushToChart(result.data);
+  } catch (err) {
+    console.error('Realtime error:', err);
+    document.getElementById('statusDot').classList.remove('online');
+  }
+}
+
+function renderCards(data) {
+  const grid = document.getElementById('cardsGrid');
+  const cbStatus = parseInt(data.cb_status);
+  const units = getUnits();
+
+  let html = `
+    <div class="status-cb-card ${cbStatus === 0 ? 'trip' : ''}">
+      <div>
+        <div class="cb-label">Status Circuit Breaker</div>
+        <div class="cb-text">${cbStatus === 0 ? 'TRIP' : 'NORMAL (ON)'}</div>
+      </div>
+      <div class="cb-icon">${cbStatus === 0 ? '⚠️' : '✅'}</div>
+    </div>
+  `;
+
+  if (data.daily_usage_kwh !== undefined) {
+    html += `
+      <div class="card">
+        <div class="card-title">Daya Terpakai Hari Ini</div>
+        <div class="card-value">${formatNumber(data.daily_usage_kwh)}<span class="card-unit">kWh</span></div>
+      </div>
+    `;
+  }
+
+  Object.keys(data).forEach(key => {
+    if (key === 'timestamp' || key === 'cb_status' || key === 'daily_usage_kwh') return;
+    const value = data[key];
+    const unit = units[key] || '';
+    const numVal = parseFloat(value);
+    const isAlert = key.toLowerCase().includes('thd') && numVal > 5;
+    html += `
+      <div class="card ${isAlert ? 'alert' : ''}">
+        <div class="card-title" title="${key}">${key}</div>
+        <div class="card-value">${formatNumber(value)}<span class="card-unit">${unit}</span></div>
+      </div>
+    `;
+  });
+
+  grid.innerHTML = html;
+}
+
+function checkCBAlert(cbStatus) {
+  const banner = document.getElementById('alertBanner');
+  if (parseInt(cbStatus) === 0) {
+    banner.classList.add('show');
+    document.getElementById('alertText').textContent = 'CB TRIP TERDETEKSI! Segera periksa panel listrik.';
+    if (Notification.permission === 'granted') {
+      new Notification('⚠️ CB TRIP', { body: 'Circuit Breaker dalam kondisi TRIP!' });
+    }
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+/* ============ CHART ============ */
+async function loadChartParams() {
+  try {
+    const result = await apiCall('realtime');
+    if (!result.data) return;
+    const select = document.getElementById('chartParamSelect');
+    select.innerHTML = '<option value="">-- Pilih parameter --</option>';
+    Object.keys(result.data).forEach(key => {
+      if (key === 'timestamp' || key === 'cb_status') return;
+      select.innerHTML += `<option value="${key}">${key}</option>`;
+    });
+  } catch (err) {}
+}
+
+function pushToChart(data) {
+  const param = document.getElementById('chartParamSelect').value;
+  if (!param) return;
+  const now = new Date().toLocaleTimeString('id-ID');
+  const val = parseFloat(data[param]);
+  chartData.labels.push(now);
+  chartData.values.push(val);
+  if (chartData.labels.length > CHART_MAX_POINTS) {
+    chartData.labels.shift();
+    chartData.values.shift();
+  }
+  updateChart();
+}
+
+function loadChartData() {
+  selectedParam = document.getElementById('chartParamSelect').value;
+  if (!selectedParam) { showToast('Pilih parameter dulu'); return; }
+  chartData = { labels: [], values: [] };
+  loadChartHistory();
+}
+
+async function loadChartHistory() {
+  try {
+    const result = await apiCall('latest', { limit: CHART_MAX_POINTS });
+    if (!result.data || result.data.length === 0) return;
+    result.data.forEach(row => {
+      if (row.timestamp && row[selectedParam] !== undefined) {
+        const t = String(row.timestamp).split(' ')[1] || row.timestamp;
+        chartData.labels.push(t);
+        chartData.values.push(parseFloat(row[selectedParam]));
+      }
+    });
+    updateChart();
+  } catch (err) { showToast('Gagal load: ' + err.message); }
+}
+
+function updateChart() {
+  const ctx = document.getElementById('realtimeChart').getContext('2d');
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const textColor = isDark ? '#f7fafc' : '#1a202c';
+  const gridColor = isDark ? '#4a5568' : '#e2e8f0';
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: chartData.labels,
+      datasets: [{
+        label: selectedParam, data: chartData.values,
+        borderColor: '#4CAF50', backgroundColor: 'rgba(76,175,80,0.1)',
+        borderWidth: 2, tension: 0.3, pointRadius: 2, fill: true
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 300 },
+      plugins: { legend: { labels: { color: textColor } } },
+      scales: {
+        x: { ticks: { color: textColor, maxTicksLimit: 10 }, grid: { color: gridColor } },
+        y: { ticks: { color: textColor }, grid: { color: gridColor } }
+      }
+    }
+  });
+}
+
+function clearChart() {
+  selectedParam = null;
+  chartData = { labels: [], values: [] };
+  if (chart) { chart.destroy(); chart = null; }
+  document.getElementById('chartParamSelect').value = '';
+}
+
+/* ============ HISTORY ============ */
+async function loadHistory() {
+  const date = document.getElementById('historyDate').value;
+  if (!date) { showToast('Pilih tanggal'); return; }
+  const tbody = document.querySelector('#historyTable tbody');
+  tbody.innerHTML = '<tr><td class="loading"><div class="spinner"></div>Memuat...</td></tr>';
+
+  try {
+    const result = await apiCall('history', { date });
+    historyData = result.data || [];
+    if (historyData.length === 0) {
+      tbody.innerHTML = '<tr><td class="loading">Tidak ada data</td></tr>';
+      document.getElementById('historyInfo').textContent = '';
+      return;
+    }
+    document.getElementById('historyInfo').textContent = `Menampilkan ${historyData.length} baris untuk ${date}`;
+    renderHistoryTable(historyData);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td class="loading">Error: ${err.message}</td></tr>`;
+  }
+}
+
+function renderHistoryTable(data) {
+  if (data.length === 0) return;
+  const headers = Object.keys(data[0]);
+  const thead = document.querySelector('#historyTable thead');
+  const tbody = document.querySelector('#historyTable tbody');
+  thead.innerHTML = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+
+  const search = (document.getElementById('historySearch').value || '').toLowerCase();
+  const filtered = search ? data.filter(row => headers.some(h => String(row[h]).toLowerCase().includes(search))) : data;
+  const limited = filtered.slice(0, 500);
+
+  tbody.innerHTML = limited.map(row => {
+    return '<tr>' + headers.map(h => {
+      let val = row[h];
+      if (h === 'cb_status' && parseInt(val) === 0) return `<td class="alert">${val} (TRIP)</td>`;
+      return `<td>${typeof val === 'number' ? val.toFixed(2) : val}</td>`;
+    }).join('') + '</tr>';
+  }).join('');
+
+  if (filtered.length > 500) {
+    tbody.innerHTML += `<tr><td colspan="${headers.length}" style="text-align:center;color:var(--text-muted);">... dan ${filtered.length - 500} baris lainnya.</td></tr>`;
+  }
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'historySearch' && historyData.length > 0) renderHistoryTable(historyData);
+});
+
+/* ============ EXPORT CSV ============ */
+function exportCSV() {
+  if (historyData.length === 0) { showToast('Tidak ada data'); return; }
+  const headers = Object.keys(historyData[0]);
+  const rows = historyData.map(row => headers.map(h => {
+    let v = row[h];
+    if (typeof v === 'string' && (v.includes(',') || v.includes('"'))) v = '"' + v.replace(/"/g, '""') + '"';
+    return v;
+  }).join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ION9000_${document.getElementById('historyDate').value}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV ter-download');
+}
+
+/* ============ SUMMARY ============ */
+async function loadSummary() {
+  const date = document.getElementById('summaryDate').value;
+  if (!date) { showToast('Pilih tanggal'); return; }
+  const content = document.getElementById('summaryContent');
+  content.innerHTML = '<div class="loading" style="grid-column:1/-1;"><div class="spinner"></div>Memuat...</div>';
+  try {
+    const result = await apiCall('daily_summary', { date });
+    if (!result.data) {
+      content.innerHTML = '<div class="loading" style="grid-column:1/-1;">Tidak ada data</div>';
+      return;
+    }
+    let html = '';
+    Object.entries(result.data).forEach(([param, stats]) => {
+      html += `
+        <div class="summary-card">
+          <h4>${param}</h4>
+          <div class="stat"><span class="stat-label">Min</span><span class="stat-value">${formatNumber(stats.min)}</span></div>
+          <div class="stat"><span class="stat-label">Max</span><span class="stat-value">${formatNumber(stats.max)}</span></div>
+          <div class="stat"><span class="stat-label">Rata-rata</span><span class="stat-value">${formatNumber(stats.avg)}</span></div>
+        </div>
+      `;
+    });
+    content.innerHTML = html;
+  } catch (err) {
+    content.innerHTML = `<div class="loading" style="grid-column:1/-1;">Error: ${err.message}</div>`;
+  }
+}
+
+/* ============ THEME ============ */
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  document.getElementById('themeIcon').textContent = next === 'dark' ? '☀️' : '🌙';
+  localStorage.setItem('theme', next);
+  if (chart) updateChart();
+}
+(function() {
+  const saved = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  const icon = document.getElementById('themeIcon');
+  if (icon) icon.textContent = saved === 'dark' ? '☀️' : '🌙';
+})();
+
+/* ============ UTIL ============ */
+function formatNumber(v) {
+  if (v === null || v === undefined || v === '') return '-';
+  const n = parseFloat(v);
+  if (isNaN(n)) return v;
+  return n.toFixed(2);
+}
+
+function getUnits() {
+  return {
+    'Current A':'A','Current B':'A','Current C':'A','Current N':'A','Current G':'A','Current Avg':'A',
+    'Voltage A-B':'V','Voltage B-C':'V','Voltage C-A':'V','Voltage L-L Avg':'V',
+    'Active Power Total':'W','Reactive Power Total':'VAR','Apparent Power Total':'VA',
+    'Frequency':'Hz','power factor':'PF',
+    'THD Current A':'%','THD Current B':'%','THD Current C':'%','THD Current N':'%','THD Current G':'%',
+    'THD Voltage A-N':'%','THD Voltage B-N':'%','THD Voltage C-N':'%','THD Voltage 4-N':'%',
+    'TDD Current A 10 Minute':'%','TDD Current B 10 Minute':'%','TDD Current C 10 Minute':'%',
+    'Active Energy Delivered (Into Load)':'kWh',
+    'reactive Energy Delivered (Into Load)':'VARh',
+    'apparent Energy Delivered (Into Load)':'VAh',
+    'Active Energy Received (Out of Load)':'kWh',
+    'Active Power Total Last Demand':'W',
+    'Reactive Power Total Last Demand':'VAR',
+    'Apparent Power Total Last Demand':'VA',
+    'daily_usage_kwh':'kWh'
+  };
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+</script>
+</body>
+</html>
