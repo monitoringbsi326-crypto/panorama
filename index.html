@@ -292,6 +292,11 @@ td.alert { color: var(--danger); font-weight: 600; }
 #toast.show { opacity: 1; transform: translateY(0); }
 
 /* ============ ALARM POPUP MODAL ============ */
+.alarm-item.cb-trip      { background: rgba(229,62,62,0.2);  border-left-color: #e53e3e; font-weight: 600; }
+.alarm-item.overvoltage  { background: rgba(237,137,54,0.15); border-left-color: #ed8936; }
+.alarm-item.undervoltage { background: rgba(237,137,54,0.15); border-left-color: #ed8936; }
+.alarm-item.overcurrent  { background: rgba(229,62,62,0.15);  border-left-color: #e53e3e; }
+.alarm-item.undercurrent { background: rgba(49,130,206,0.15); border-left-color: #3182ce; }
 #alarmModal {
   display: none; position: fixed; inset: 0;
   background: rgba(0,0,0,0.65); z-index: 9999;
@@ -1327,22 +1332,28 @@ async function loadSummary() {
 }
 
 /* ============ ALARM SYSTEM ============ */
+/* ============ CEK ALARM (HANYA CRITICAL POPUP) ============ */
 async function cekAlarm() {
   if (!authToken) return;
   try {
     const result = await apiCall('alerts');
     if (result.status !== 'success' || !result.data || result.data.length === 0) {
       updateAlarmBell([]);
+      currentAlarms = [];
       return;
     }
 
-    // Ambil alarm yang belum dibaca / baru
     const alarms = result.data;
+    currentAlarms = alarms;
 
-    // Tampilkan alarm terbaru yang belum pernah ditampilkan
+    // Ambil alarm terbaru
     const latest = alarms[alarms.length - 1];
 
-    if (latest && latest.ts && latest.ts !== lastShownAlarmTime && latest.sent) {
+    // Popup HANYA kalau alarm baru & punya critical
+    if (latest &&
+        latest.ts &&
+        latest.ts !== lastShownAlarmTime &&
+        latest.hasCritical === true) {       // ← flag baru dari GS
       lastShownAlarmTime = latest.ts;
       showAlarmPopup(alarms);
     }
@@ -1352,53 +1363,69 @@ async function cekAlarm() {
     console.warn('Cek alarm error:', err);
   }
 }
+  
 
 function updateAlarmBell(alarms) {
   const bell = document.getElementById('alarmBell');
-  const hasRecent = alarms.some(a => (Date.now() - a.ts) < 30 * 60 * 1000); // 30 menit terakhir
-  if (hasRecent) {
-    bell.classList.add('has-alarm');
-  } else {
-    bell.classList.remove('has-alarm');
-  }
+
+  // Bell merah HANYA kalau ada critical dalam 30 menit terakhir
+  const hasRecentCritical = alarms.some(a =>
+    (Date.now() - a.ts) < 30 * 60 * 1000 && a.hasCritical === true
+  );
+
+  bell.classList.toggle('has-alarm', hasRecentCritical);
 }
+  
 
 function showAlarmPopup(alarms) {
   const modal = document.getElementById('alarmModal');
   const body = document.getElementById('alarmBody');
   const timeEl = document.getElementById('alarmTime');
 
-  // Ambil 5 alarm terakhir
-  const recent = alarms.slice(-5).reverse();
+  // Filter: hanya entry yang punya critical
+  const criticalEntries = alarms.filter(a => a.hasCritical === true);
+  if (criticalEntries.length === 0) return;
+
+  // Ambil 5 critical terbaru
+  const recent = criticalEntries.slice(-5).reverse();
 
   let html = '';
-  recent.forEach(a => {
-    const types = a.types || [];
-    let cls = 'alarm-item';
-    if (types.includes('cb_trip')) cls += ' cb-trip';
-    else if (types.includes('undervoltage')) cls += ' undervoltage';
+  recent.forEach(entry => {
+    // Tampilkan HANYA alarm yang critical
+    const critOnly = (entry.alarms || []).filter(x => x.critical === true);
 
-    html += `<div class="${cls}">
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">🕐 ${a.t}</div>
-      ${a.msg}
-    </div>`;
+    critOnly.forEach(alarm => {
+      let cls = 'alarm-item';
+      if (alarm.type === 'cb_trip')         cls += ' cb-trip';
+      else if (alarm.type === 'undervoltage') cls += ' undervoltage';
+      else if (alarm.type === 'overvoltage')  cls += ' overvoltage';
+      else if (alarm.type === 'overcurrent')  cls += ' overcurrent';
+      else if (alarm.type === 'undercurrent') cls += ' undercurrent';
+
+      html += `<div class="${cls}">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">🕐 ${entry.t}</div>
+        ${alarm.message}
+      </div>`;
+    });
   });
+
+  if (!html) return;
 
   body.innerHTML = html;
   timeEl.textContent = 'Alarm terbaru: ' + recent[0].t;
 
   modal.classList.add('show');
 
-  // Mainkan suara
+  // Bunyi HANYA kalau critical & belum dibisukan
   if (!alarmSoundMuted) {
     playAlarmSound();
   }
 
-  // Kirim notifikasi browser (jika diizinkan)
+  // Notifikasi browser
   if (Notification.permission === 'granted') {
-    new Notification('🚨 ION9000 ALARM', {
+    new Notification('🚨 EIM CRITICAL ALARM', {
       body: recent[0].msg.substring(0, 120),
-      tag: 'ion9000-alarm'
+      tag: 'eim-alarm'
     });
   }
 }
