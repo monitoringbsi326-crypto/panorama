@@ -292,11 +292,6 @@ td.alert { color: var(--danger); font-weight: 600; }
 #toast.show { opacity: 1; transform: translateY(0); }
 
 /* ============ ALARM POPUP MODAL ============ */
-.alarm-item.cb-trip      { background: rgba(229,62,62,0.2);  border-left-color: #e53e3e; font-weight: 600; }
-.alarm-item.overvoltage  { background: rgba(237,137,54,0.15); border-left-color: #ed8936; }
-.alarm-item.undervoltage { background: rgba(237,137,54,0.15); border-left-color: #ed8936; }
-.alarm-item.overcurrent  { background: rgba(229,62,62,0.15);  border-left-color: #e53e3e; }
-.alarm-item.undercurrent { background: rgba(49,130,206,0.15); border-left-color: #3182ce; }
 #alarmModal {
   display: none; position: fixed; inset: 0;
   background: rgba(0,0,0,0.65); z-index: 9999;
@@ -339,8 +334,27 @@ td.alert { color: var(--danger); font-weight: 600; }
   margin-bottom: 8px; font-size: 13px; color: var(--text);
   line-height: 1.5;
 }
-.alarm-item.cb-trip { background: rgba(229,62,62,0.2); font-weight: 600; }
-.alarm-item.undervoltage { background: rgba(237,137,54,0.15); border-left-color: var(--warning); }
+.alarm-item.cb-trip {
+  background: rgba(229,62,62,0.2);
+  border-left-color: #e53e3e;
+  font-weight: 600;
+}
+.alarm-item.overvoltage {
+  background: rgba(237,137,54,0.15);
+  border-left-color: #ed8936;
+}
+.alarm-item.undervoltage {
+  background: rgba(237,137,54,0.15);
+  border-left-color: #ed8936;
+}
+.alarm-item.overcurrent {
+  background: rgba(229,62,62,0.15);
+  border-left-color: #e53e3e;
+}
+.alarm-item.undercurrent {
+  background: rgba(49,130,206,0.15);
+  border-left-color: #3182ce;
+}
 .alarm-time { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
 .alarm-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .alarm-btn {
@@ -477,9 +491,6 @@ td.alert { color: var(--danger); font-weight: 600; }
           <label>Sampai:</label>
           <input type="datetime-local" id="rangeEnd">
           <button class="btn" onclick="applyCustomRange()">Terapkan</button>
-          <button class="btn btn-outline" onclick="setQuickRange(1)">24 Jam</button>
-          <button class="btn btn-outline" onclick="setQuickRange(7)">7 Hari</button>
-          <button class="btn btn-outline" onclick="setQuickRange(30)">30 Hari</button>
         </div>
 
         <div style="margin-top: 12px; margin-bottom: 8px; font-size: 12px; color: var(--text-muted);">
@@ -602,7 +613,7 @@ let alarmPollTimer = null;
 let historyChart = null;
 let cbChart = null;
 let currentPeriod = '1d';
-let customRange = null; // { start: ms, end: ms }
+let customRange = null;
 let selectedParams = new Set();
 let historyData = [];
 let lastShownAlarmTime = null;
@@ -696,17 +707,20 @@ function initApp() {
   });
 
   // Set default custom range = 24 jam terakhir
-  setQuickRange(1);
+  const _end = new Date();
+  const _start = new Date(_end.getTime() - 24 * 60 * 60 * 1000);
+  document.getElementById('rangeStart').value = toLocalDatetime(_start);
+  document.getElementById('rangeEnd').value = toLocalDatetime(_end);
+  customRange = { start: _start.getTime(), end: _end.getTime() };
 
   loadRealtime();
   loadParamChips();
-  cekAlarm(); // cek alarm pertama kali
+  cekAlarm();
 
   refreshTimer = setInterval(() => {
     if (document.querySelector('.tab-content.active').id === 'tab-realtime') loadRealtime();
   }, REFRESH_INTERVAL_MS);
 
-  // Polling alarm
   alarmPollTimer = setInterval(cekAlarm, ALARM_POLL_INTERVAL_MS);
 }
 
@@ -783,7 +797,6 @@ function renderCards(data) {
     const value = data[key];
     const unit = units[key] || '';
     const numVal = parseFloat(value);
-    // Alert jika THD > 5 atau undervoltage (< 18000)
     let isAlert = false;
     if (key.toLowerCase().includes('thd') && numVal > 5) isAlert = true;
     if (key.toLowerCase().includes('voltage') && numVal > 0 && numVal < 18000) isAlert = true;
@@ -863,19 +876,6 @@ function setPeriod(period) {
   }
 }
 
-function setQuickRange(days) {
-  const end = new Date();
-  const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
-
-  document.getElementById('rangeStart').value = toLocalDatetime(start);
-  document.getElementById('rangeEnd').value = toLocalDatetime(end);
-
-  customRange = {
-    start: start.getTime(),
-    end: end.getTime()
-  };
-}
-
 function applyCustomRange() {
   const startVal = document.getElementById('rangeStart').value;
   const endVal = document.getElementById('rangeEnd').value;
@@ -919,20 +919,17 @@ async function loadHistoryChart() {
     try {
       let result;
       if (currentPeriod === 'custom' && customRange) {
-        // Untuk custom range, kita pakai chart endpoint default tapi filter di client
-        result = await apiCall('chart', { period: '1m', param: param });
+        result = await apiCall('chart', {
+          start: customRange.start,
+          end: customRange.end,
+          param: param
+        });
       } else {
         result = await apiCall('chart', { period: currentPeriod, param: param });
       }
 
       if (result.status === 'success' && result.data.length > 0) {
         let points = result.data.map(d => ({ x: d.t, y: d.avg }));
-
-        // Filter custom range di client
-        if (currentPeriod === 'custom' && customRange) {
-          points = points.filter(p => p.x >= customRange.start && p.x <= customRange.end);
-        }
-
         if (points.length === 0) continue;
 
         datasets.push({
@@ -1026,29 +1023,26 @@ async function loadCbTimeline() {
   try {
     let result;
     if (currentPeriod === 'custom' && customRange) {
-      result = await apiCall('cb_timeline', { period: '1m' });
+      result = await apiCall('cb_timeline', {
+        start: customRange.start,
+        end: customRange.end
+      });
     } else {
       result = await apiCall('cb_timeline', { period: currentPeriod });
     }
 
     if (result.status !== 'success') {
-      document.getElementById('cbStatsDetail').innerHTML = 
+      document.getElementById('cbStatsDetail').innerHTML =
         '<div style="color:var(--text-muted);font-size:12px;">Gagal memuat data CB</div>';
       return;
     }
 
     let timeline = result.data || [];
-
-    // Filter custom range di client
-    if (currentPeriod === 'custom' && customRange) {
-      timeline = timeline.filter(p => p.t >= customRange.start && p.t <= customRange.end);
-    }
-
     renderCbChart(timeline);
     renderCbStats(result.stats || {}, timeline);
   } catch (err) {
     console.error('CB timeline error:', err);
-    document.getElementById('cbStatsDetail').innerHTML = 
+    document.getElementById('cbStatsDetail').innerHTML =
       `<div style="color:var(--danger);font-size:12px;">Error: ${err.message}</div>`;
   }
 }
@@ -1080,7 +1074,6 @@ function renderCbChart(timeline) {
     return;
   }
 
-  // Buat 2 dataset: normal (1) dan trip (0) → supaya warna terpisah
   const normalPoints = timeline.filter(p => p.s === 1).map(p => ({ x: p.t, y: 1 }));
   const tripPoints   = timeline.filter(p => p.s === 0).map(p => ({ x: p.t, y: 0 }));
 
@@ -1166,7 +1159,6 @@ function renderCbStats(stats, timeline) {
   const container = document.getElementById('cbStatsDetail');
   const header = document.getElementById('cbStatsHeader');
 
-  // Hitung ulang trip dari timeline yang sudah difilter
   let tripCount = 0;
   let tripDurationMs = 0;
   let lastTripStart = null;
@@ -1332,7 +1324,6 @@ async function loadSummary() {
 }
 
 /* ============ ALARM SYSTEM ============ */
-/* ============ CEK ALARM (HANYA CRITICAL POPUP) ============ */
 async function cekAlarm() {
   if (!authToken) return;
   try {
@@ -1346,14 +1337,12 @@ async function cekAlarm() {
     const alarms = result.data;
     currentAlarms = alarms;
 
-    // Ambil alarm terbaru
     const latest = alarms[alarms.length - 1];
 
-    // Popup HANYA kalau alarm baru & punya critical
     if (latest &&
         latest.ts &&
         latest.ts !== lastShownAlarmTime &&
-        latest.hasCritical === true) {       // ← flag baru dari GS
+        latest.hasCritical === true) {
       lastShownAlarmTime = latest.ts;
       showAlarmPopup(alarms);
     }
@@ -1363,40 +1352,42 @@ async function cekAlarm() {
     console.warn('Cek alarm error:', err);
   }
 }
-  
 
 function updateAlarmBell(alarms) {
   const bell = document.getElementById('alarmBell');
-
-  // Bell merah HANYA kalau ada critical dalam 30 menit terakhir
   const hasRecentCritical = alarms.some(a =>
     (Date.now() - a.ts) < 30 * 60 * 1000 && a.hasCritical === true
   );
-
   bell.classList.toggle('has-alarm', hasRecentCritical);
 }
-  
 
 function showAlarmPopup(alarms) {
   const modal = document.getElementById('alarmModal');
   const body = document.getElementById('alarmBody');
   const timeEl = document.getElementById('alarmTime');
+  const titleEl = document.getElementById('alarmTitle');
+  const subtitleEl = document.getElementById('alarmSubtitle');
 
-  // Filter: hanya entry yang punya critical
   const criticalEntries = alarms.filter(a => a.hasCritical === true);
-  if (criticalEntries.length === 0) return;
 
-  // Ambil 5 critical terbaru
-  const recent = criticalEntries.slice(-5).reverse();
+  if (criticalEntries.length === 0) {
+    titleEl.textContent = 'STATUS NORMAL';
+    titleEl.style.color = 'var(--primary)';
+    subtitleEl.textContent = 'Tidak ada alarm critical aktif';
+    body.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">✅ Tidak ada alarm critical</div>';
+    timeEl.textContent = '';
+    modal.classList.add('show');
+    return;
+  }
+
+  const recent = criticalEntries.slice(-10).reverse();
 
   let html = '';
   recent.forEach(entry => {
-    // Tampilkan HANYA alarm yang critical
     const critOnly = (entry.alarms || []).filter(x => x.critical === true);
-
     critOnly.forEach(alarm => {
       let cls = 'alarm-item';
-      if (alarm.type === 'cb_trip')         cls += ' cb-trip';
+      if (alarm.type === 'cb_trip')          cls += ' cb-trip';
       else if (alarm.type === 'undervoltage') cls += ' undervoltage';
       else if (alarm.type === 'overvoltage')  cls += ' overvoltage';
       else if (alarm.type === 'overcurrent')  cls += ' overcurrent';
@@ -1409,19 +1400,29 @@ function showAlarmPopup(alarms) {
     });
   });
 
-  if (!html) return;
+  if (!html) {
+    titleEl.textContent = 'STATUS NORMAL';
+    titleEl.style.color = 'var(--primary)';
+    subtitleEl.textContent = '';
+    body.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">✅ Tidak ada alarm critical</div>';
+    timeEl.textContent = '';
+    modal.classList.add('show');
+    return;
+  }
 
   body.innerHTML = html;
   timeEl.textContent = 'Alarm terbaru: ' + recent[0].t;
 
+  titleEl.textContent = 'ALARM TERDETEKSI';
+  titleEl.style.color = 'var(--danger)';
+  subtitleEl.textContent = 'Periksa panel listrik segera';
+
   modal.classList.add('show');
 
-  // Bunyi HANYA kalau critical & belum dibisukan
   if (!alarmSoundMuted) {
     playAlarmSound();
   }
 
-  // Notifikasi browser
   if (Notification.permission === 'granted') {
     new Notification('🚨 EIM CRITICAL ALARM', {
       body: recent[0].msg.substring(0, 120),
@@ -1431,16 +1432,21 @@ function showAlarmPopup(alarms) {
 }
 
 function showAlarmModal() {
-  const modal = document.getElementById('alarmModal');
+  const titleEl = document.getElementById('alarmTitle');
+  titleEl.textContent = 'ALARM TERDETEKSI';
+  titleEl.style.color = 'var(--danger)';
+
   if (currentAlarms.length > 0) {
     showAlarmPopup(currentAlarms);
   } else {
-    modal.classList.add('show');
+    const modal = document.getElementById('alarmModal');
     document.getElementById('alarmBody').innerHTML =
-      '<div style="text-align:center;color:var(--text-muted);padding:20px;">Tidak ada alarm aktif ✅</div>';
+      '<div style="text-align:center;color:var(--text-muted);padding:20px;">✅ Tidak ada alarm aktif</div>';
     document.getElementById('alarmTime').textContent = '';
-    document.getElementById('alarmTitle').textContent = 'STATUS NORMAL';
-    document.getElementById('alarmTitle').style.color = 'var(--primary)';
+    document.getElementById('alarmSubtitle').textContent = '';
+    titleEl.textContent = 'STATUS NORMAL';
+    titleEl.style.color = 'var(--primary)';
+    modal.classList.add('show');
   }
 }
 
@@ -1449,6 +1455,7 @@ function closeAlarmModal() {
   stopAlarmSound();
   document.getElementById('alarmTitle').textContent = 'ALARM TERDETEKSI';
   document.getElementById('alarmTitle').style.color = 'var(--danger)';
+  document.getElementById('alarmSubtitle').textContent = 'Periksa panel listrik segera';
 }
 
 function playAlarmSound() {
