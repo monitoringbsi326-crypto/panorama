@@ -10,6 +10,31 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
+
+/* ============ SAFE AREA ============ */
+body {
+  padding-top: env(safe-area-inset-top, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+main {
+  padding-bottom: calc(var(--nav-height) + 20px + env(safe-area-inset-bottom, 0));
+}
+
+header {
+  padding-top: calc(10px + env(safe-area-inset-top, 0));
+}
+
+.bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  height: calc(var(--nav-height) + env(safe-area-inset-bottom, 0));
+}
+
+@media (max-width: 768px) {
+  main {
+    padding-bottom: calc(var(--nav-height) + 16px + env(safe-area-inset-bottom, 0));
+  }
+}
 /* ============ AUTO-FIT / ANTI-OVERFLOW ============ */
 html, body {
   width: 100%;
