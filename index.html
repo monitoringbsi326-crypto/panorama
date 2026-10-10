@@ -1346,8 +1346,9 @@ function renderCards(data) {
       const numVal = parseFloat(value);
       let cls = '';
 
-      if (key.toLowerCase().includes('thd') && numVal > 5) cls = 'alert';
-      else if (key.toLowerCase().includes('tdd') && numVal > 5) cls = 'alert';
+      if (key.toLowerCase().includes('THD Current A', 'THD Current B', 'THD Current C', 'THD Current N', 'THD Current G') && numVal > 5) cls = 'alert';
+      else if (key.toLowerCase().includes('THD Voltage': ['THD Voltage A-N', 'THD Voltage B-N', 'THD Voltage C-N', 'THD Voltage 4-N') && numVal > 5) cls = 'alert';
+      else if (key.toLowerCase().includes('tdd') && numVal > 20) cls = 'alert';
       else if (key.toLowerCase().includes('voltage') && numVal > 0 && numVal < 19000) cls = 'alert';
       else if (key.toLowerCase().includes('voltage') && numVal > 21000) cls = 'alert';
       else if (key.toLowerCase().includes('current') && numVal > 250) cls = 'alert';
