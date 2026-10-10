@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#4CAF50">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>ION9000 Monitor</title>
+<title>EIM Monitoring System</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
@@ -30,290 +30,273 @@ body {
 
 /* LOGIN */
 #loginScreen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
-.login-box {
-  background: var(--card-bg); padding: 36px 28px; border-radius: 16px;
-  box-shadow: var(--shadow-lg); width: 100%; max-width: 380px;
-}
+.login-box { background: var(--card-bg); padding: 36px 28px; border-radius: 16px; box-shadow: var(--shadow-lg); width: 100%; max-width: 380px; }
 .login-box h1 { margin-bottom: 6px; color: var(--primary); font-size: 26px; text-align: center; }
 .login-box .sub { color: var(--text-muted); margin-bottom: 28px; text-align: center; font-size: 13px; }
 .login-box label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; }
-.login-box input {
-  width: 100%; padding: 13px 16px; border: 1px solid var(--border);
-  border-radius: 10px; font-size: 15px; margin-bottom: 16px;
-  background: var(--bg); color: var(--text); -webkit-appearance: none;
-}
+.login-box input { width: 100%; padding: 13px 16px; border: 1px solid var(--border); border-radius: 10px; font-size: 15px; margin-bottom: 16px; background: var(--bg); color: var(--text); -webkit-appearance: none; }
 .login-box input:focus { outline: none; border-color: var(--primary); }
-.login-box button {
-  width: 100%; padding: 14px; background: var(--primary); color: white;
-  border: none; border-radius: 10px; font-size: 16px; font-weight: 600;
-  cursor: pointer; transition: background 0.2s; min-height: 48px;
-}
+.login-box button { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; min-height: 48px; }
 .login-box button:hover { background: var(--primary-hover); }
 .login-box button:disabled { opacity: 0.6; cursor: not-allowed; }
+.login-box input {width: 100%; padding: 13px 16px; border: 1px solid var(--border);border-radius: 10px; font-size: 15px; margin-bottom: 16px;background: var(--bg); color: var(--text); -webkit-appearance: none;
 #loginError { color: var(--danger); margin-top: 12px; font-size: 13px; text-align: center; min-height: 18px; }
 
-/* HEADER */
-header {
-  background: var(--card-bg); border-bottom: 1px solid var(--border);
-  padding: 12px 16px; display: flex; justify-content: space-between;
-  align-items: center; position: sticky; top: 0; z-index: 100;
-  box-shadow: var(--shadow); gap: 10px;
+/* Password wrapper dengan toggle show/hide */
+.password-wrapper {
+  position: relative;
+  margin-bottom: 16px;
 }
-header h1 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.password-wrapper input {
+  margin-bottom: 0;
+  padding-right: 48px; /* ruang untuk ikon */
+}
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+.password-toggle:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+.password-toggle:active {
+  transform: translateY(-50%) scale(0.9);
+}
+                  
+/* HEADER */
+header { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow); gap: 8px; }
+header h1 { font-size: 15px; display: flex; align-items: center; gap: 6px; font-weight: 700; }
 .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); display: inline-block; flex-shrink: 0; }
 .status-dot.online { background: var(--primary); box-shadow: 0 0 8px var(--primary); }
-.header-right { display: flex; align-items: center; gap: 8px; }
+.header-right { display: flex; align-items: center; gap: 6px; }
 .user-info { font-size: 12px; color: var(--text-muted); display: none; }
-.icon-btn {
-  width: 38px; height: 38px; padding: 0; border-radius: 10px;
-  background: transparent; border: 1px solid var(--border);
-  color: var(--text); cursor: pointer; font-size: 17px;
-  display: flex; align-items: center; justify-content: center;
-}
+.icon-btn { width: 36px; height: 36px; padding: 0; border-radius: 9px; background: transparent; border: 1px solid var(--border); color: var(--text); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
 .icon-btn:hover { background: var(--bg); }
 
-/* TABS */
-.tabs { display: none; gap: 4px; padding: 12px 16px 0; background: var(--card-bg); border-bottom: 1px solid var(--border); overflow-x: auto; }
-.tab {
-  padding: 10px 18px; border: none; background: transparent;
-  color: var(--text-muted); cursor: pointer; border-radius: 8px 8px 0 0;
-  font-size: 14px; font-weight: 500; white-space: nowrap;
-  border-bottom: 3px solid transparent;
-}
-.tab.active { color: var(--primary); border-bottom-color: var(--primary); }
-.tab:hover:not(.active) { background: var(--bg); }
+/* NAVBAR */
+.navbar { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 6px 12px; display: flex; align-items: center; gap: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; box-shadow: var(--shadow); }
+.navbar::-webkit-scrollbar { height: 0; }
+.nav-item { display: flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 8px; background: transparent; border: 1px solid transparent; color: var(--text-muted); font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: all 0.15s; min-height: 34px; }
+.nav-item:hover { background: var(--bg); color: var(--text); }
+.nav-item.active { background: var(--primary); color: white; border-color: var(--primary); }
 
 /* MAIN */
-main { padding: 16px; max-width: 1600px; margin: 0 auto; padding-bottom: calc(var(--nav-height) + 20px); }
+main { padding: 12px; max-width: 1600px; margin: 0 auto; padding-bottom: calc(var(--nav-height) + 20px); }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-/* ALERT */
-#alertBanner {
-  display: none; background: var(--danger); color: white;
-  padding: 14px 16px; border-radius: 12px; margin-bottom: 16px;
-  align-items: center; gap: 10px; font-weight: 600; font-size: 14px;
-  animation: pulse 1.5s infinite; box-shadow: var(--shadow-lg);
-}
-#alertBanner.show { display: flex; }
+/* ============ CARDS GROUPING ============ */
+.card-group { margin-bottom: 16px; }
+.card-group-title { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; padding-left: 2px; display: flex; align-items: center; gap: 6px; }
+
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.card { background: var(--card-bg); border-radius: 10px; padding: 10px; box-shadow: var(--shadow); transition: all 0.2s; border-left: 4px solid var(--primary); position: relative; min-height: 65px; display: flex; flex-direction: column; justify-content: space-between; }
+.card.alert { border-left-color: var(--danger); background: rgba(229, 62, 62, 0.08); }
+.card.warning { border-left-color: var(--warning); background: rgba(237, 137, 54, 0.08); }
+.card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.card .card-title { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .card-value { font-size: 17px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .card-unit { font-size: 10px; color: var(--text-muted); margin-left: 2px; font-weight: 500; }
+
+/* Status CB Card */
+.status-cb-card { grid-column: span 2; background: linear-gradient(135deg, var(--primary) 0%, #2f855a 100%); color: white; border-left: none; display: flex; align-items: center; justify-content: space-between; padding: 14px; min-height: 72px; border-radius: 10px; box-shadow: var(--shadow); margin-bottom: 16px; }
+.status-cb-card.trip { background: linear-gradient(135deg, var(--danger) 0%, #9b2c2c 100%); animation: pulse 1.5s infinite; }
+.status-cb-card .cb-icon { font-size: 28px; }
+.status-cb-card .cb-text { font-size: 20px; font-weight: 700; margin-top: 2px; }
+.status-cb-card .cb-label { font-size: 10px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.75;} }
 
-/* CARDS */
-.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
-.card {
-  background: var(--card-bg); border-radius: 12px; padding: 14px;
-  box-shadow: var(--shadow); transition: all 0.2s;
-  border-left: 4px solid var(--primary); position: relative;
-}
-.card.alert { border-left-color: var(--danger); background: rgba(229,62,62,0.1); }
-.card .card-title {
-  font-size: 10px; color: var(--text-muted); text-transform: uppercase;
-  letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.card .card-value { font-size: 20px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.2; }
-.card .card-unit { font-size: 11px; color: var(--text-muted); margin-left: 3px; font-weight: 500; }
-
-.status-cb-card {
-  grid-column: span 2;
-  background: linear-gradient(135deg, var(--primary) 0%, #2f855a 100%);
-  color: white; border-left: none; display: flex;
-  align-items: center; justify-content: space-between; padding: 18px;
-}
-.status-cb-card.trip {
-  background: linear-gradient(135deg, var(--danger) 0%, #9b2c2c 100%);
-  animation: pulse 1.5s infinite;
-}
-.status-cb-card .cb-icon { font-size: 32px; }
-.status-cb-card .cb-text { font-size: 20px; font-weight: 700; margin-top: 4px; }
-.status-cb-card .cb-label { font-size: 10px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; }
+/* ALERT BANNER */
+#alertBanner { display: none; background: var(--danger); color: white; padding: 12px 14px; border-radius: 10px; margin-bottom: 12px; align-items: center; gap: 10px; font-weight: 600; font-size: 13px; animation: pulse 1.5s infinite; box-shadow: var(--shadow-lg); }
+#alertBanner.show { display: flex; }
 
 /* CHART PANEL */
-.chart-panel {
-  background: var(--card-bg); border-radius: 12px; padding: 16px;
-  box-shadow: var(--shadow); margin-bottom: 16px;
-}
-.chart-header {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 14px; flex-wrap: wrap; gap: 10px;
-}
-.chart-header h3 { font-size: 15px; font-weight: 600; }
+.chart-panel { background: var(--card-bg); border-radius: 12px; padding: 14px; box-shadow: var(--shadow); margin-bottom: 14px; }
+.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.chart-header h3 { font-size: 14px; font-weight: 700; }
 
-.period-filter {
-  display: flex; gap: 6px; background: var(--bg); padding: 4px;
-  border-radius: 10px; border: 1px solid var(--border);
-}
-.period-btn {
-  flex: 1; padding: 8px 14px; border: none; background: transparent;
-  color: var(--text-muted); border-radius: 7px; cursor: pointer;
-  font-size: 13px; font-weight: 600; white-space: nowrap;
-  transition: all 0.2s; min-height: 36px;
-}
+.period-filter { display: flex; gap: 4px; background: var(--bg); padding: 3px; border-radius: 9px; border: 1px solid var(--border); flex-wrap: wrap; }
+.period-btn { flex: 1; padding: 7px 12px; border: none; background: transparent; color: var(--text-muted); border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; transition: all 0.2s; min-height: 34px; }
 .period-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 4px rgba(76,175,80,0.3); }
 .period-btn:not(.active):hover { background: var(--card-bg); }
 
-.param-chips {
-  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;
-  overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch;
-}
-.chip {
-  padding: 7px 12px; border-radius: 16px; background: var(--bg);
-  border: 1px solid var(--border); font-size: 12px; cursor: pointer;
-  transition: all 0.15s; color: var(--text); white-space: nowrap;
-  user-select: none; min-height: 32px;
-  display: flex; align-items: center;
-}
+.range-panel { display: none; margin-top: 10px; padding: 10px; background: var(--bg); border-radius: 10px; border: 1px solid var(--border); gap: 8px; flex-wrap: wrap; align-items: center; }
+.range-panel.show { display: flex; }
+.range-panel label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.range-panel input[type="datetime-local"] { padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--card-bg); color: var(--text); font-size: 12px; min-height: 36px; }
+
+.param-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.chip { padding: 6px 11px; border-radius: 14px; background: var(--bg); border: 1px solid var(--border); font-size: 11px; cursor: pointer; transition: all 0.15s; color: var(--text); white-space: nowrap; user-select: none; min-height: 30px; display: flex; align-items: center; font-weight: 500; }
 .chip.selected { background: var(--primary); color: white; border-color: var(--primary); }
 .chip:active { transform: scale(0.95); }
 
-.chart-wrap { position: relative; height: 320px; }
+.chart-wrap { position: relative; height: 280px; }
 .chart-info { font-size: 11px; color: var(--text-muted); margin-top: 10px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 
 /* CB TIMELINE */
-.cb-legend { display: flex; gap: 16px; margin-bottom: 10px; font-size: 12px; color: var(--text-muted); }
-.cb-legend-item { display: flex; align-items: center; gap: 6px; }
-.cb-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.cb-legend { display: flex; gap: 14px; margin-bottom: 8px; font-size: 11px; color: var(--text-muted); }
+.cb-legend-item { display: flex; align-items: center; gap: 5px; }
+.cb-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .cb-dot.normal { background: #4CAF50; }
 .cb-dot.trip { background: #e53e3e; animation: pulse 1.5s infinite; }
 
-.cb-stats {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 10px; margin-top: 12px;
-}
-.cb-stat-item { background: var(--bg); border-radius: 8px; padding: 10px 12px; border: 1px solid var(--border); }
-.cb-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-.cb-stat-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cb-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-top: 10px; }
+.cb-stat-item { background: var(--bg); border-radius: 8px; padding: 9px 11px; border: 1px solid var(--border); }
+.cb-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; font-weight: 600; }
+.cb-stat-value { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .cb-stat-value.danger { color: var(--danger); }
 .cb-stat-value.success { color: var(--primary); }
 
 /* HISTORY */
-.history-controls {
-  background: var(--card-bg); padding: 14px; border-radius: 12px;
-  box-shadow: var(--shadow); margin-bottom: 14px;
-  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
-}
-.history-controls input {
-  padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
-  background: var(--card-bg); color: var(--text); font-size: 14px;
-  flex: 1; min-width: 140px; min-height: 42px;
-}
-.btn {
-  padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer;
-  font-size: 14px; font-weight: 500; transition: all 0.2s;
-  background: var(--primary); color: white; min-height: 42px;
-}
+.history-controls { background: var(--card-bg); padding: 12px; border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.history-controls input { padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); font-size: 13px; flex: 1; min-width: 120px; min-height: 40px; }
+.btn { padding: 9px 14px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; background: var(--primary); color: white; min-height: 40px; }
 .btn:hover { background: var(--primary-hover); }
 .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
 .btn-outline:hover { background: var(--bg); }
 
 /* TABLE */
-.table-wrap {
-  background: var(--card-bg); border-radius: 12px;
-  box-shadow: var(--shadow); overflow: auto; max-height: 500px;
-  -webkit-overflow-scrolling: touch;
-}
-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-th, td {
-  padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border);
-  white-space: nowrap; font-variant-numeric: tabular-nums;
-}
-th {
-  background: var(--bg); font-weight: 600; position: sticky; top: 0;
-  z-index: 2; font-size: 10px; text-transform: uppercase;
-  letter-spacing: 0.5px; color: var(--text-muted);
-}
-td.alert { color: var(--danger); font-weight: 600; }
+.table-wrap { background: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow); overflow: auto; max-height: 500px; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; font-size: 11px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; font-variant-numeric: tabular-nums; }
+th { background: var(--bg); font-weight: 700; position: sticky; top: 0; z-index: 2; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+td.alert { color: var(--danger); font-weight: 700; }
 
 /* SUMMARY */
-.summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-.summary-card { background: var(--card-bg); border-radius: 12px; padding: 14px; box-shadow: var(--shadow); }
-.summary-card h4 {
-  font-size: 11px; color: var(--text-muted); margin-bottom: 10px;
-  text-transform: uppercase; letter-spacing: 0.5px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.summary-card .stat { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; font-variant-numeric: tabular-nums; }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.summary-card { background: var(--card-bg); border-radius: 10px; padding: 12px; box-shadow: var(--shadow); }
+.summary-card h4 { font-size: 10px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
+.summary-card .stat { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; font-variant-numeric: tabular-nums; }
 .summary-card .stat-label { color: var(--text-muted); }
 .summary-card .stat-value { font-weight: 600; }
 
 /* BOTTOM NAV */
-.bottom-nav {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  height: var(--nav-height); background: var(--card-bg);
-  border-top: 1px solid var(--border); display: flex;
-  z-index: 200; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
-  padding-bottom: env(safe-area-inset-bottom, 0);
-}
-.nav-btn {
-  flex: 1; border: none; background: transparent; color: var(--text-muted);
-  cursor: pointer; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 2px;
-  font-size: 10px; font-weight: 500; padding: 6px 4px;
-  transition: color 0.2s;
-}
+.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: var(--nav-height); background: var(--card-bg); border-top: 1px solid var(--border); display: flex; z-index: 200; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); padding-bottom: env(safe-area-inset-bottom, 0); }
+.nav-btn { flex: 1; border: none; background: transparent; color: var(--text-muted); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 10px; font-weight: 600; padding: 6px 4px; transition: color 0.2s; position: relative; }
 .nav-btn .nav-icon { font-size: 20px; line-height: 1; }
 .nav-btn.active { color: var(--primary); }
 .nav-btn:active { background: var(--bg); }
 
 /* LOADING */
-.loading { text-align: center; padding: 40px; color: var(--text-muted); }
-.spinner {
-  border: 3px solid var(--border); border-top-color: var(--primary);
-  border-radius: 50%; width: 30px; height: 30px;
-  animation: spin 0.8s linear infinite; margin: 0 auto 12px;
-}
+.loading { text-align: center; padding: 40px; color: var(--text-muted); font-size: 13px; }
+.spinner { border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; width: 28px; height: 28px; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* SKELETON */
+.skeleton { background: linear-gradient(90deg, var(--bg) 25%, var(--border) 50%, var(--bg) 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; border-radius: 10px; height: 65px; }
+@keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
 /* TOAST */
-#toast {
-  position: fixed; bottom: calc(var(--nav-height) + 16px); right: 16px; left: 16px;
-  background: var(--text); color: var(--bg);
-  padding: 12px 16px; border-radius: 10px;
-  box-shadow: var(--shadow-lg); opacity: 0; transform: translateY(20px);
-  transition: all 0.3s; z-index: 1000; font-size: 13px;
-  text-align: center; pointer-events: none;
-}
+#toast { position: fixed; bottom: calc(var(--nav-height) + 16px); right: 16px; left: 16px; background: var(--text); color: var(--bg); padding: 11px 14px; border-radius: 10px; box-shadow: var(--shadow-lg); opacity: 0; transform: translateY(20px); transition: all 0.3s; z-index: 1000; font-size: 12px; text-align: center; pointer-events: none; font-weight: 500; }
 #toast.show { opacity: 1; transform: translateY(0); }
+
+/* ALARM MODAL */
+#alarmModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 9999; align-items: center; justify-content: center; padding: 16px; animation: fadeIn 0.2s; }
+#alarmModal.show { display: flex; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.alarm-box { background: var(--card-bg); border-radius: 16px; max-width: 500px; width: 100%; padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); border-top: 6px solid var(--danger); animation: slideUp 0.3s; max-height: 90vh; overflow-y: auto; }
+@keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.alarm-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.alarm-icon { font-size: 32px; animation: shake 0.5s infinite; }
+@keyframes shake { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
+.alarm-title { font-size: 18px; font-weight: 700; color: var(--danger); margin: 0; }
+.alarm-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.alarm-body { margin-bottom: 14px; max-height: 250px; overflow-y: auto; }
+.alarm-item { padding: 9px 12px; background: rgba(229,62,62,0.1); border-left: 4px solid var(--danger); border-radius: 6px; margin-bottom: 7px; font-size: 12px; color: var(--text); line-height: 1.4; }
+.alarm-item.cb-trip { background: rgba(229,62,62,0.2); font-weight: 600; }
+.alarm-item.undervoltage { background: rgba(237,137,54,0.15); border-left-color: var(--warning); }
+.alarm-time { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
+.alarm-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.alarm-btn { padding: 9px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+.alarm-btn-close { background: var(--danger); color: white; }
+.alarm-btn-close:hover { background: #c53030; }
+.alarm-btn-mute { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+.alarm-btn-mute:hover { background: var(--bg); }
+
+.alarm-bell { position: relative; }
+.alarm-bell.has-alarm::after { content: ''; position: absolute; top: 3px; right: 3px; width: 9px; height: 9px; border-radius: 50%; background: var(--danger); animation: pulse 1s infinite; border: 2px solid var(--card-bg); }
 
 .hidden { display: none !important; }
 
-/* MOBILE */
+/* ============ MOBILE ============ */
 @media (max-width: 768px) {
-  .tabs { display: none; }
   .user-info { display: none; }
-  header h1 { font-size: 15px; }
-  main { padding: 12px; padding-bottom: calc(var(--nav-height) + 16px); }
-  .cards-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .card { padding: 12px; }
-  .card .card-value { font-size: 17px; }
-  .status-cb-card { grid-column: span 2; padding: 16px; }
+  header h1 { font-size: 14px; }
+  main { padding: 10px; padding-bottom: calc(var(--nav-height) + 16px); }
+  
+  /* Cards 2 kolom */
+  .cards-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 7px; }
+  .card { padding: 9px; min-height: 60px; }
+  .card .card-value { font-size: 15px; }
+  .card .card-title { font-size: 8px; }
+  .card .card-unit { font-size: 9px; }
+  .status-cb-card { padding: 12px; min-height: 68px; }
   .status-cb-card .cb-text { font-size: 18px; }
-  .status-cb-card .cb-icon { font-size: 28px; }
-  .chart-panel { padding: 12px; }
-  .chart-wrap { height: 260px; }
-  .period-btn { padding: 7px 10px; font-size: 12px; }
-  .history-controls { padding: 12px; }
-  .history-controls input { font-size: 16px; }
-  .summary-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .summary-card { padding: 12px; }
-  .summary-card .stat { font-size: 12px; }
+  .status-cb-card .cb-icon { font-size: 24px; }
+  
+  /* Summary 2 kolom */
+  .summary-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 7px; }
+  .summary-card { padding: 10px; }
+  .summary-card h4 { font-size: 9px; margin-bottom: 6px; }
+  .summary-card .stat { font-size: 11px; }
+  
+  /* Chart */
+  .chart-panel { padding: 11px; }
+  .chart-wrap { height: 240px; }
+  .period-btn { padding: 6px 9px; font-size: 11px; }
+  
+  /* History */
+  .history-controls { padding: 10px; }
+  .history-controls input { font-size: 14px; min-height: 42px; }
+  .btn { font-size: 12px; }
+  
+  /* CB Stats */
   .cb-stats { grid-template-columns: repeat(2, 1fr); }
-  .cb-stat-value { font-size: 16px; }
+  .cb-stat-value { font-size: 15px; }
+  
+  /* Chart info */
+  .chart-info { font-size: 10px; }
+  
+  /* Group title */
+  .card-group-title { font-size: 10px; margin-bottom: 6px; }
+  .card-group { margin-bottom: 12px; }
+  
+  /* Range panel */
+  .range-panel { flex-direction: column; align-items: stretch; }
+  .range-panel input { width: 100%; }
 }
 
+/* ============ TABLET ============ */
 @media (min-width: 769px) and (max-width: 1024px) {
-  .tabs { display: flex; }
+  .user-info { display: block; }
+  .cards-grid { grid-template-columns: repeat(3, 1fr); }
+  .chart-wrap { height: 320px; }
+}
+
+/* ============ DESKTOP ============ */
+@media (min-width: 1025px) {
+  .user-info { display: block; }
+  main { padding: 16px; padding-bottom: 20px; }
+  .cards-grid { grid-template-columns: repeat(4, 1fr); }
+  .chart-wrap { height: 400px; }
   .bottom-nav { display: none; }
   main { padding-bottom: 20px; }
-  .cards-grid { grid-template-columns: repeat(3, 1fr); }
-}
-
-@media (min-width: 1025px) {
-  .tabs { display: flex; }
-  .bottom-nav { display: none; }
-  main { padding: 20px; padding-bottom: 20px; }
-  .user-info { display: block; }
-  .chart-wrap { height: 420px; }
 }
 </style>
 </head>
@@ -322,12 +305,17 @@ td.alert { color: var(--danger); font-weight: 600; }
 <!-- LOGIN -->
 <div id="loginScreen">
   <div class="login-box">
-    <h1>⚡ ION9000</h1>
-    <p class="sub">Monitoring Dashboard</p>
+    <h1>⚡ EIM Monitoring</h1>
+    <p class="sub">Electrical Monitoring System</p>
     <label for="username">Username</label>
     <input type="text" id="username" autocomplete="username" autofocus>
-    <label for="password">Password</label>
-    <input type="password" id="password" autocomplete="current-password">
+<label for="password">Password</label>
+<div class="password-wrapper">
+  <input type="password" id="password" autocomplete="current-password">
+  <button type="button" class="password-toggle" onclick="togglePassword()" id="passwordToggle" title="Tampilkan password">
+    👁️
+  </button>
+</div>
     <button id="loginBtn" onclick="doLogin()">Masuk</button>
     <div id="loginError"></div>
   </div>
@@ -336,9 +324,10 @@ td.alert { color: var(--danger); font-weight: 600; }
 <!-- APP -->
 <div id="app" class="hidden">
   <header>
-    <h1><span class="status-dot" id="statusDot"></span> BSI electrical monitoring</h1>
+    <h1><span class="status-dot" id="statusDot"></span> EIM Monitoring</h1>
     <div class="header-right">
       <div class="user-info" id="userName"></div>
+      <button class="icon-btn alarm-bell" id="alarmBell" onclick="showAlarmModal()" title="Alarm">🔔</button>
       <button class="icon-btn" onclick="toggleTheme()" title="Toggle tema">
         <span id="themeIcon">🌙</span>
       </button>
@@ -346,18 +335,19 @@ td.alert { color: var(--danger); font-weight: 600; }
     </div>
   </header>
 
-  <div class="tabs">
-    <button class="tab active" data-tab="realtime">📊 Realtime</button>
-    <button class="tab" data-tab="chart">📈 Grafik</button>
-    <button class="tab" data-tab="history">📅 Histori</button>
-    <button class="tab" data-tab="summary">📋 Ringkasan</button>
+  <!-- NAVBAR -->
+  <div class="navbar" id="navbar">
+    <button class="nav-item active" data-page="realtime" onclick="switchPage('realtime')">📊 Realtime</button>
+    <button class="nav-item" data-page="chart" onclick="switchPage('chart')">📈 Grafik</button>
+    <button class="nav-item" data-page="history" onclick="switchPage('history')">📅 Histori</button>
+    <button class="nav-item" data-page="summary" onclick="switchPage('summary')">📋 Ringkasan</button>
   </div>
 
   <main>
     <!-- REALTIME -->
     <div class="tab-content active" id="tab-realtime">
       <div id="alertBanner">⚠️ <span id="alertText">CB TRIP!</span></div>
-      <div class="cards-grid" id="cardsGrid">
+      <div id="cardsGrid">
         <div class="loading"><div class="spinner"></div>Memuat...</div>
       </div>
     </div>
@@ -371,11 +361,20 @@ td.alert { color: var(--danger); font-weight: 600; }
             <button class="period-btn active" data-period="1d" onclick="setPeriod('1d')">1 Hari</button>
             <button class="period-btn" data-period="1w" onclick="setPeriod('1w')">1 Minggu</button>
             <button class="period-btn" data-period="1m" onclick="setPeriod('1m')">1 Bulan</button>
+            <button class="period-btn" data-period="custom" onclick="setPeriod('custom')">📅 Custom</button>
           </div>
         </div>
 
-        <div style="margin-bottom: 8px; font-size: 12px; color: var(--text-muted);">
-          Pilih parameter (bisa lebih dari satu):
+        <div class="range-panel" id="rangePanel">
+          <label>Dari:</label>
+          <input type="datetime-local" id="rangeStart">
+          <label>Sampai:</label>
+          <input type="datetime-local" id="rangeEnd">
+          <button class="btn" onclick="applyCustomRange()">Terapkan</button>
+        </div>
+
+        <div style="margin-top: 10px; margin-bottom: 6px; font-size: 11px; color: var(--text-muted);">
+          Pilih parameter (bisa lebih dari satu, maks 5):
         </div>
         <div class="param-chips" id="paramChips"></div>
 
@@ -385,22 +384,18 @@ td.alert { color: var(--danger); font-weight: 600; }
         <div class="chart-info" id="chartInfo"></div>
       </div>
 
-      <!-- CB TRIP TIMELINE -->
       <div class="chart-panel">
         <div class="chart-header">
           <h3>⚡ Grafik Status CB</h3>
           <span id="cbStatsHeader" style="font-size:12px;color:var(--text-muted);"></span>
         </div>
-
         <div class="cb-legend">
           <span class="cb-legend-item"><span class="cb-dot normal"></span>Normal (ON)</span>
           <span class="cb-legend-item"><span class="cb-dot trip"></span>Trip</span>
         </div>
-
         <div class="chart-wrap" style="height: 160px;">
           <canvas id="cbChart"></canvas>
         </div>
-
         <div class="cb-stats" id="cbStatsDetail"></div>
       </div>
     </div>
@@ -413,7 +408,7 @@ td.alert { color: var(--danger); font-weight: 600; }
         <button class="btn" onclick="loadHistory()">Muat</button>
         <button class="btn btn-outline" onclick="exportCSV()">📥 CSV</button>
       </div>
-      <div id="historyInfo" style="margin-bottom: 10px; color: var(--text-muted); font-size: 12px;"></div>
+      <div id="historyInfo" style="margin-bottom: 10px; color: var(--text-muted); font-size: 11px;"></div>
       <div class="table-wrap">
         <table id="historyTable">
           <thead></thead>
@@ -438,42 +433,99 @@ td.alert { color: var(--danger); font-weight: 600; }
 
   <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
-    <button class="nav-btn active" data-tab="realtime" onclick="switchTab('realtime')">
+    <button class="nav-btn active" data-tab="realtime" onclick="switchPage('realtime')">
       <span class="nav-icon">📊</span>Realtime
     </button>
-    <button class="nav-btn" data-tab="chart" onclick="switchTab('chart')">
+    <button class="nav-btn" data-tab="chart" onclick="switchPage('chart')">
       <span class="nav-icon">📈</span>Grafik
     </button>
-    <button class="nav-btn" data-tab="history" onclick="switchTab('history')">
+    <button class="nav-btn" data-tab="history" onclick="switchPage('history')">
       <span class="nav-icon">📅</span>Histori
     </button>
-    <button class="nav-btn" data-tab="summary" onclick="switchTab('summary')">
+    <button class="nav-btn" data-tab="summary" onclick="switchPage('summary')">
       <span class="nav-icon">📋</span>Ringkasan
     </button>
   </nav>
 </div>
+
+<!-- ALARM MODAL -->
+<div id="alarmModal">
+  <div class="alarm-box">
+    <div class="alarm-header">
+      <div class="alarm-icon">🚨</div>
+      <div>
+        <h2 class="alarm-title" id="alarmTitle">ALARM TERDETEKSI</h2>
+        <div class="alarm-subtitle" id="alarmSubtitle">Periksa panel listrik segera</div>
+      </div>
+    </div>
+    <div class="alarm-time" id="alarmTime"></div>
+    <div class="alarm-body" id="alarmBody"></div>
+    <div class="alarm-actions">
+      <button class="alarm-btn alarm-btn-mute" onclick="muteAlarmSound()" id="muteBtn">🔇 Bisukan</button>
+      <button class="alarm-btn alarm-btn-close" onclick="closeAlarmModal()">TUTUP</button>
+    </div>
+  </div>
+</div>
+
+<audio id="alarmSound" preload="auto" loop>
+  <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+  <source src="https://actions.google.com/sounds/v1/alarms/beep_short.mp3" type="audio/mpeg">
+</audio>
 
 <div id="toast"></div>
 
 <script>
 /* ============ KONFIG ============ */
 const API_URL = "https://script.google.com/macros/s/AKfycbxAFAVCym991JDn6hsSyCQj0M1dve1r-QtJbdN4s0e2NFic328ULlXGPfRFV04Zow_GKQ/exec";
-const REFRESH_INTERVAL_MS = 10000;
+const REFRESH_INTERVAL_MS = 15000;
+const ALARM_POLL_INTERVAL_MS = 15000;
 
+/* ============ TOGGLE PASSWORD ============ */
+function togglePassword() {
+  const input = document.getElementById('password');
+  const toggle = document.getElementById('passwordToggle');
+
+  if (input.type === 'password') {
+    input.type = 'text';
+    toggle.textContent = '🙈';
+    toggle.title = 'Sembunyikan password';
+  } else {
+    input.type = 'password';
+    toggle.textContent = '👁️';
+    toggle.title = 'Tampilkan password';
+  }
+}
+  
 /* ============ STATE ============ */
 let authToken = null;
 let currentUser = null;
 let refreshTimer = null;
+let alarmPollTimer = null;
 let historyChart = null;
 let cbChart = null;
 let currentPeriod = '1d';
+let customRange = null;
 let selectedParams = new Set();
 let historyData = [];
+let lastShownAlarmTime = null;
+let alarmSoundMuted = false;
+let currentAlarms = [];
+let currentPage = 'realtime';
 
-const COLORS = [
-  '#4CAF50', '#3182ce', '#ed8936', '#e53e3e', '#805ad5',
-  '#38b2ac', '#d69e2e', '#dd6b20', '#319795', '#b83280'
-];
+const COLORS = ['#4CAF50', '#3182ce', '#ed8936', '#e53e3e', '#805ad5', '#38b2ac', '#d69e2e', '#dd6b20', '#319795', '#b83280'];
+
+/* ============ CACHE FRONTEND ============ */
+const cache = {
+  data: {},
+  timeouts: {},
+  get(key) { return this.data[key]; },
+  set(key, value, ttlMs = 10000) {
+    this.data[key] = value;
+    if (this.timeouts[key]) clearTimeout(this.timeouts[key]);
+    this.timeouts[key] = setTimeout(() => { delete this.data[key]; }, ttlMs);
+  },
+  clear() { this.data = {}; this.timeouts = {}; }
+};
 
 /* ============ LOGIN ============ */
 async function doLogin() {
@@ -529,6 +581,7 @@ function logout() {
   localStorage.removeItem('auth_user');
   localStorage.removeItem('auth_expires');
   if (refreshTimer) clearInterval(refreshTimer);
+  if (alarmPollTimer) clearInterval(alarmPollTimer);
   location.reload();
 }
 
@@ -551,32 +604,63 @@ function initApp() {
   document.getElementById('historyDate').value = today;
   document.getElementById('summaryDate').value = today;
 
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
-  });
+  const _end = new Date();
+  const _start = new Date(_end.getTime() - 24 * 60 * 60 * 1000);
+  document.getElementById('rangeStart').value = toLocalDatetime(_start);
+  document.getElementById('rangeEnd').value = toLocalDatetime(_end);
+  customRange = { start: _start.getTime(), end: _end.getTime() };
 
   loadRealtime();
   loadParamChips();
+  cekAlarm();
+
+  // Auto-select chip setelah chips muncul
+  setTimeout(() => {
+    if (selectedParams.size === 0) toggleParam('Voltage A-B');
+  }, 1500);
 
   refreshTimer = setInterval(() => {
-    if (document.querySelector('.tab-content.active').id === 'tab-realtime') loadRealtime();
+    if (document.hidden) return;
+    if (currentPage === 'realtime') loadRealtime();
   }, REFRESH_INTERVAL_MS);
+
+  alarmPollTimer = setInterval(cekAlarm, ALARM_POLL_INTERVAL_MS);
 }
 
-function switchTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-  document.querySelectorAll('.nav-btn').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
+/* ============ PAGE SWITCHING ============ */
+function switchPage(pageName) {
+  currentPage = pageName;
+
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.page === pageName);
+  });
+
+  document.querySelectorAll('.tab-content').forEach(c => {
+    c.classList.toggle('active', c.id === 'tab-' + pageName);
+  });
+
+  document.querySelectorAll('.nav-btn').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === pageName);
+  });
+
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  if (name === 'chart') {
+  if (pageName === 'realtime') loadRealtime();
+  if (pageName === 'chart') {
     if (selectedParams.size > 0) loadHistoryChart();
     loadCbTimeline();
   }
 }
 
 /* ============ API ============ */
-async function apiCall(action, params = {}) {
+async function apiCall(action, params = {}, useCache = true) {
+  const cacheKey = action + ':' + JSON.stringify(params);
+  
+  if (useCache) {
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+  }
+  
   const url = new URL(API_URL);
   url.searchParams.set('action', action);
   url.searchParams.set('token', authToken);
@@ -589,7 +673,12 @@ async function apiCall(action, params = {}) {
     throw new Error('Unauthorized');
   }
   if (!res.ok) throw new Error('HTTP ' + res.status);
-  return await res.json();
+  
+  const result = await res.json();
+  if (useCache && result.status === 'success') {
+    cache.set(cacheKey, result, 10000);
+  }
+  return result;
 }
 
 /* ============ REALTIME ============ */
@@ -612,6 +701,29 @@ function renderCards(data) {
   const grid = document.getElementById('cardsGrid');
   const cbStatus = parseInt(data.cb_status);
   const units = getUnits();
+
+  // Definisi grup
+  const groups = {
+    'Daya & Energi': ['daily_usage_kwh', 'Active Power Total', 'Reactive Power Total', 'Apparent Power Total', 'Frequency', 'power factor'],
+    'Tegangan': ['Voltage A-B', 'Voltage B-C', 'Voltage C-A', 'Voltage L-L Avg'],
+    'Arus': ['Current A', 'Current B', 'Current C', 'Current N', 'Current G', 'Current Avg'],
+    'THD Current': ['THD Current A', 'THD Current B', 'THD Current C', 'THD Current N', 'THD Current G'],
+    'THD Voltage': ['THD Voltage A-N', 'THD Voltage B-N', 'THD Voltage C-N', 'THD Voltage 4-N'],
+    'TDD': ['TDD Current A 10 Minute', 'TDD Current B 10 Minute', 'TDD Current C 10 Minute'],
+    'Energi Total': [
+      'Active Energy Delivered (Into Load)',
+      'reactive Energy Delivered (Into Load)',
+      'apparent Energy Delivered (Into Load)',
+      'Active Energy Received (Out of Load)'
+    ],
+    'Demand': [
+      'Active Power Total Last Demand',
+      'Reactive Power Total Last Demand',
+      'Apparent Power Total Last Demand'
+    ]
+  };
+
+  // Header: Status CB
   let html = `
     <div class="status-cb-card ${cbStatus === 0 ? 'trip' : ''}">
       <div>
@@ -622,25 +734,36 @@ function renderCards(data) {
     </div>
   `;
 
-  if (data.daily_usage_kwh !== undefined) {
-    html += `
-      <div class="card">
-        <div class="card-title">Daya Hari Ini</div>
-        <div class="card-value">${formatNumber(data.daily_usage_kwh)}<span class="card-unit">kWh</span></div>
-      </div>
-    `;
-  }
+  // Render per group
+  Object.keys(groups).forEach(groupName => {
+    const groupKeys = groups[groupName].filter(k => data[k] !== undefined);
+    if (groupKeys.length === 0) return;
 
-  Object.keys(data).forEach(key => {
-    if (key === 'timestamp' || key === 'cb_status' || key === 'daily_usage_kwh') return;
-    const value = data[key];
-    const unit = units[key] || '';
-    const numVal = parseFloat(value);
-    const isAlert = key.toLowerCase().includes('thd') && numVal > 5;
+    let groupHtml = '';
+    groupKeys.forEach(key => {
+      const value = data[key];
+      const unit = units[key] || '';
+      const numVal = parseFloat(value);
+      let cls = '';
+
+      if (key.toLowerCase().includes('thd') && numVal > 5) cls = 'alert';
+      else if (key.toLowerCase().includes('tdd') && numVal > 5) cls = 'alert';
+      else if (key.toLowerCase().includes('voltage') && numVal > 0 && numVal < 19000) cls = 'alert';
+      else if (key.toLowerCase().includes('voltage') && numVal > 21000) cls = 'alert';
+      else if (key.toLowerCase().includes('current') && numVal > 250) cls = 'alert';
+
+      groupHtml += `
+        <div class="card ${cls}">
+          <div class="card-title" title="${key}">${key}</div>
+          <div class="card-value">${formatNumber(value)}<span class="card-unit">${unit}</span></div>
+        </div>
+      `;
+    });
+
     html += `
-      <div class="card ${isAlert ? 'alert' : ''}">
-        <div class="card-title" title="${key}">${key}</div>
-        <div class="card-value">${formatNumber(value)}<span class="card-unit">${unit}</span></div>
+      <div class="card-group">
+        <div class="card-group-title">📊 ${groupName}</div>
+        <div class="cards-grid">${groupHtml}</div>
       </div>
     `;
   });
@@ -653,9 +776,6 @@ function checkCBAlert(cbStatus) {
   if (parseInt(cbStatus) === 0) {
     banner.classList.add('show');
     document.getElementById('alertText').textContent = 'CB TRIP! Periksa panel listrik.';
-    if (Notification.permission === 'granted') {
-      new Notification('⚠️ CB TRIP', { body: 'Circuit Breaker dalam kondisi TRIP!' });
-    }
   } else {
     banner.classList.remove('show');
   }
@@ -703,11 +823,42 @@ function setPeriod(period) {
   document.querySelectorAll('.period-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.period === period);
   });
+
+  const rangePanel = document.getElementById('rangePanel');
+  if (period === 'custom') {
+    rangePanel.classList.add('show');
+  } else {
+    rangePanel.classList.remove('show');
+    customRange = null;
+    if (selectedParams.size > 0) loadHistoryChart();
+    loadCbTimeline();
+  }
+}
+
+function applyCustomRange() {
+  const startVal = document.getElementById('rangeStart').value;
+  const endVal = document.getElementById('rangeEnd').value;
+
+  if (!startVal || !endVal) { showToast('Isi tanggal mulai & selesai'); return; }
+
+  const start = new Date(startVal).getTime();
+  const end = new Date(endVal).getTime();
+
+  if (isNaN(start) || isNaN(end)) { showToast('Format tanggal tidak valid'); return; }
+  if (start >= end) { showToast('Tanggal mulai harus lebih awal'); return; }
+
+  customRange = { start, end };
+  currentPeriod = 'custom';
   if (selectedParams.size > 0) loadHistoryChart();
   loadCbTimeline();
 }
 
-/* ============ CHART PARAMETER ============ */
+function toLocalDatetime(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/* ============ CHART ============ */
 async function loadHistoryChart() {
   if (selectedParams.size === 0) return;
 
@@ -725,26 +876,31 @@ async function loadHistoryChart() {
 
   for (const param of selectedParams) {
     try {
-      const result = await apiCall('chart', { period: currentPeriod, param: param });
+      let result;
+      if (currentPeriod === 'custom' && customRange) {
+        result = await apiCall('chart', { start: customRange.start, end: customRange.end, param });
+      } else {
+        result = await apiCall('chart', { period: currentPeriod, param });
+      }
+
       if (result.status === 'success' && result.data.length > 0) {
+        const points = result.data.map(d => ({ x: d.t, y: d.avg }));
         datasets.push({
           label: param,
-          data: result.data.map(d => ({ x: d.t, y: d.avg })),
+          data: points,
           borderColor: COLORS[i % COLORS.length],
           backgroundColor: COLORS[i % COLORS.length] + '20',
           borderWidth: 2,
           tension: 0.3,
-          pointRadius: 1.5,
+          pointRadius: 0,
           fill: false,
           spanGaps: true
         });
-        totalPoints += result.data.length;
-        if (result.meta) bucketInfo = `${result.meta.bucketMinutes} menit/bucket`;
+        totalPoints += points.length;
+        if (result.meta && result.meta.bucketMs) bucketInfo = Math.round(result.meta.bucketMs / 60000) + ' menit/bucket';
         i++;
       }
-    } catch (err) {
-      console.warn('Chart error for ' + param + ':', err);
-    }
+    } catch (err) { console.warn('Chart error:', err); }
   }
 
   if (historyChart) historyChart.destroy();
@@ -760,42 +916,35 @@ async function loadHistoryChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: false,
       interaction: { mode: 'index', intersect: false },
-      animation: { duration: 300 },
       plugins: {
-        legend: { labels: { color: textColor, boxWidth: 12, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            title: (items) => {
-              const d = new Date(items[0].parsed.x);
-              return d.toLocaleString('id-ID', {
-                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-              });
-            }
-          }
-        }
+        legend: { labels: { color: textColor, boxWidth: 12, font: { size: 11 } } }
       },
       scales: {
         x: {
           type: 'time',
-          time: {
-            displayFormats: {
-              second: 'HH:mm', minute: 'HH:mm', hour: 'HH:mm',
-              day: 'dd MMM', week: 'dd MMM', month: 'MMM yyyy'
-            }
-          },
-          ticks: { color: textColor, maxTicksLimit: 8 },
+          time: { displayFormats: { minute: 'HH:mm', hour: 'HH:mm', day: 'dd MMM', month: 'MMM yyyy' } },
+          ticks: { color: textColor, maxTicksLimit: 6, autoSkip: true },
           grid: { color: gridColor }
         },
         y: {
-          ticks: { color: textColor },
+          ticks: { color: textColor, maxTicksLimit: 5 },
           grid: { color: gridColor }
         }
       }
     }
   });
 
-  const periodLabel = currentPeriod === '1d' ? '1 Hari' : currentPeriod === '1w' ? '1 Minggu' : '1 Bulan';
+  let periodLabel;
+  if (currentPeriod === 'custom' && customRange) {
+    const s = new Date(customRange.start).toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+    const e = new Date(customRange.end).toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+    periodLabel = `${s} → ${e}`;
+  } else {
+    periodLabel = currentPeriod === '1d' ? '1 Hari' : currentPeriod === '1w' ? '1 Minggu' : '1 Bulan';
+  }
+
   document.getElementById('chartInfo').innerHTML = `
     <span>📊 ${periodLabel} • ${totalPoints} titik • ${bucketInfo}</span>
     <span>${selectedParams.size} parameter</span>
@@ -805,18 +954,19 @@ async function loadHistoryChart() {
 /* ============ CB TIMELINE ============ */
 async function loadCbTimeline() {
   try {
-    const result = await apiCall('cb_timeline', { period: currentPeriod });
-    if (result.status !== 'success') {
-      document.getElementById('cbStatsDetail').innerHTML = 
-        '<div style="color:var(--text-muted);font-size:12px;">Gagal memuat data CB</div>';
-      return;
+    let result;
+    if (currentPeriod === 'custom' && customRange) {
+      result = await apiCall('cb_timeline', { start: customRange.start, end: customRange.end });
+    } else {
+      result = await apiCall('cb_timeline', { period: currentPeriod });
     }
+
+    if (result.status !== 'success') return;
+
     renderCbChart(result.data || []);
-    renderCbStats(result.stats || {});
+    renderCbStats(result.stats || {}, result.data || []);
   } catch (err) {
     console.error('CB timeline error:', err);
-    document.getElementById('cbStatsDetail').innerHTML = 
-      `<div style="color:var(--danger);font-size:12px;">Error: ${err.message}</div>`;
   }
 }
 
@@ -834,10 +984,7 @@ function renderCbChart(timeline) {
       data: { datasets: [] },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          title: { display: true, text: 'Tidak ada data', color: textColor }
-        },
+        plugins: { legend: { display: false }, title: { display: true, text: 'Tidak ada data', color: textColor } },
         scales: {
           x: { type: 'time', ticks: { color: textColor }, grid: { color: gridColor } },
           y: { ticks: { color: textColor }, grid: { color: gridColor }, min: -0.2, max: 1.2 }
@@ -847,122 +994,57 @@ function renderCbChart(timeline) {
     return;
   }
 
-  const data = timeline.map(p => ({ x: p.t, y: p.s }));
+  const normalPoints = timeline.filter(p => p.s === 1).map(p => ({ x: p.t, y: 1 }));
+  const tripPoints = timeline.filter(p => p.s === 0).map(p => ({ x: p.t, y: 0 }));
 
   cbChart = new Chart(ctx, {
     type: 'line',
     data: {
-      datasets: [{
-        label: 'Status CB',
-        data: data,
-        borderColor: function(context) {
-          const idx = context.dataIndex;
-          if (idx < data.length) return data[idx].y === 0 ? '#e53e3e' : '#4CAF50';
-          return '#4CAF50';
-        },
-        backgroundColor: 'rgba(76,175,80,0.1)',
-        borderWidth: 2,
-        stepped: 'after',
-        pointRadius: function(context) {
-          const idx = context.dataIndex;
-          return data[idx].y === 0 ? 5 : 0;
-        },
-        pointBackgroundColor: function(context) {
-          const idx = context.dataIndex;
-          return data[idx].y === 0 ? '#e53e3e' : '#4CAF50';
-        },
-        pointBorderColor: '#fff',
-        pointBorderWidth: 2,
-        fill: true,
-        spanGaps: true
-      }]
+      datasets: [
+        { label: 'Normal (ON)', data: normalPoints, borderColor: '#4CAF50', backgroundColor: 'rgba(76,175,80,0.1)', borderWidth: 2, stepped: 'after', pointRadius: 3, pointBackgroundColor: '#4CAF50', fill: false, spanGaps: true },
+        { label: 'Trip', data: tripPoints, borderColor: '#e53e3e', backgroundColor: 'rgba(229,62,62,0.2)', borderWidth: 2, stepped: 'after', pointRadius: 6, pointBackgroundColor: '#e53e3e', fill: false, spanGaps: true }
+      ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      animation: false,
       interaction: { mode: 'index', intersect: false },
-      animation: { duration: 300 },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            title: (items) => {
-              const d = new Date(items[0].parsed.x);
-              return d.toLocaleString('id-ID', {
-                day: '2-digit', month: 'short', year: 'numeric',
-                hour: '2-digit', minute: '2-digit', second: '2-digit'
-              });
-            },
-            label: (item) => item.parsed.y === 1 ? '✅ Normal (ON)' : '⚠️ TRIP'
-          }
-        }
-      },
+      plugins: { legend: { display: true, labels: { color: textColor, boxWidth: 12, font: { size: 11 } } } },
       scales: {
-        x: {
-          type: 'time',
-          time: {
-            displayFormats: {
-              second: 'HH:mm', minute: 'HH:mm', hour: 'HH:mm',
-              day: 'dd MMM', week: 'dd MMM', month: 'MMM yyyy'
-            }
-          },
-          ticks: { color: textColor, maxTicksLimit: 8 },
-          grid: { color: gridColor }
-        },
-        y: {
-          min: -0.2, max: 1.2,
-          ticks: {
-            color: textColor, stepSize: 1,
-            callback: v => v === 1 ? 'Normal' : v === 0 ? 'Trip' : ''
-          },
-          grid: { color: gridColor }
-        }
+        x: { type: 'time', ticks: { color: textColor, maxTicksLimit: 8 }, grid: { color: gridColor } },
+        y: { min: -0.2, max: 1.2, ticks: { color: textColor, stepSize: 1, callback: v => v === 1 ? 'Normal' : v === 0 ? 'Trip' : '' }, grid: { color: gridColor } }
       }
     }
   });
 }
 
-function renderCbStats(stats) {
+function renderCbStats(stats, timeline) {
   const container = document.getElementById('cbStatsDetail');
   const header = document.getElementById('cbStatsHeader');
 
-  const tripCount = stats.tripCount || 0;
-  const tripMin = stats.tripDurationMin || 0;
+  let tripCount = 0, tripDurationMs = 0, lastTripStart = null, prevStatus = null;
+  timeline.forEach(point => {
+    if (point.s === 0 && prevStatus !== 0) { tripCount++; lastTripStart = point.t; }
+    else if (point.s === 1 && prevStatus === 0 && lastTripStart !== null) { tripDurationMs += (point.t - lastTripStart); lastTripStart = null; }
+    prevStatus = point.s;
+  });
+  if (lastTripStart !== null && timeline.length > 0) tripDurationMs += (timeline[timeline.length - 1].t - lastTripStart);
 
-  if (tripCount > 0) {
-    header.innerHTML = `<span style="color:var(--danger);font-weight:600;">⚠️ ${tripCount} trip</span>`;
-  } else {
-    header.innerHTML = `<span style="color:var(--primary);">✅ Tidak ada trip</span>`;
-  }
+  const tripMin = Math.round(tripDurationMs / 60000);
+  header.innerHTML = tripCount > 0
+    ? `<span style="color:var(--danger);font-weight:600;">⚠️ ${tripCount} trip</span>`
+    : `<span style="color:var(--primary);">✅ Tidak ada trip</span>`;
 
   let durationText = '-';
   if (tripMin > 0) {
     if (tripMin < 60) durationText = tripMin + ' mnt';
-    else {
-      const h = Math.floor(tripMin / 60);
-      const m = tripMin % 60;
-      durationText = h + 'j ' + m + 'm';
-    }
+    else durationText = Math.floor(tripMin / 60) + 'j ' + (tripMin % 60) + 'm';
   }
 
   container.innerHTML = `
-    <div class="cb-stat-item">
-      <div class="cb-stat-label">Jumlah Trip</div>
-      <div class="cb-stat-value ${tripCount > 0 ? 'danger' : 'success'}">${tripCount}×</div>
-    </div>
-    <div class="cb-stat-item">
-      <div class="cb-stat-label">Durasi Trip</div>
-      <div class="cb-stat-value ${tripMin > 0 ? 'danger' : 'success'}">${durationText}</div>
-    </div>
-    <div class="cb-stat-item">
-      <div class="cb-stat-label">Total Data</div>
-      <div class="cb-stat-value">${stats.totalPoints || 0}</div>
-    </div>
-    <div class="cb-stat-item">
-      <div class="cb-stat-label">Periode</div>
-      <div class="cb-stat-value" style="font-size:14px;">
-        ${currentPeriod === '1d' ? '1 Hari' : currentPeriod === '1w' ? '1 Minggu' : '1 Bulan'}
-      </div>
-    </div>
+    <div class="cb-stat-item"><div class="cb-stat-label">Jumlah Trip</div><div class="cb-stat-value ${tripCount > 0 ? 'danger' : 'success'}">${tripCount}×</div></div>
+    <div class="cb-stat-item"><div class="cb-stat-label">Durasi Trip</div><div class="cb-stat-value ${tripMin > 0 ? 'danger' : 'success'}">${durationText}</div></div>
+    <div class="cb-stat-item"><div class="cb-stat-label">Total Data</div><div class="cb-stat-value">${timeline.length}</div></div>
   `;
 }
 
@@ -977,11 +1059,11 @@ async function loadHistory() {
     const result = await apiCall('history', { date });
     historyData = result.data || [];
     if (historyData.length === 0) {
-      tbody.innerHTML = '<tr><td class="loading">Tidak ada data</td></tr>';
+      tbody.innerHTML = '<tr><td class="loading">Tidak ada data untuk tanggal ' + date + '</td></tr>';
       document.getElementById('historyInfo').textContent = '';
       return;
     }
-    document.getElementById('historyInfo').textContent = `${historyData.length} baris • ${date}`;
+    document.getElementById('historyInfo').textContent = `${historyData.length} baris • ${result.date || date}`;
     renderHistoryTable(historyData);
   } catch (err) {
     tbody.innerHTML = `<tr><td class="loading">Error: ${err.message}</td></tr>`;
@@ -1001,7 +1083,7 @@ function renderHistoryTable(data) {
 
   tbody.innerHTML = limited.map(row => {
     return '<tr>' + headers.map(h => {
-      let val = row[h];
+      const val = row[h];
       if (h === 'cb_status' && parseInt(val) === 0) return `<td class="alert">${val} TRIP</td>`;
       return `<td>${typeof val === 'number' ? val.toFixed(2) : val}</td>`;
     }).join('') + '</tr>';
@@ -1030,7 +1112,7 @@ function exportCSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `ION9000_${document.getElementById('historyDate').value}.csv`;
+  a.download = `EIM_${document.getElementById('historyDate').value}.csv`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('CSV ter-download');
@@ -1045,7 +1127,7 @@ async function loadSummary() {
   try {
     const result = await apiCall('daily_summary', { date });
     if (!result.data) {
-      content.innerHTML = '<div class="loading" style="grid-column:1/-1;">Tidak ada data</div>';
+      content.innerHTML = '<div class="loading" style="grid-column:1/-1;">Tidak ada data untuk tanggal ' + date + '</div>';
       return;
     }
     let html = '';
@@ -1063,6 +1145,152 @@ async function loadSummary() {
   } catch (err) {
     content.innerHTML = `<div class="loading" style="grid-column:1/-1;">Error: ${err.message}</div>`;
   }
+}
+
+/* ============ ALARM ============ */
+async function cekAlarm() {
+  if (!authToken) return;
+  try {
+    const result = await apiCall('alerts', {}, false);
+    if (result.status !== 'success' || !result.data || result.data.length === 0) {
+      updateAlarmBell([]);
+      currentAlarms = [];
+      return;
+    }
+
+    const alarms = result.data;
+    currentAlarms = alarms;
+    const latest = alarms[alarms.length - 1];
+
+    if (latest && latest.ts && latest.ts !== lastShownAlarmTime && latest.hasCritical === true) {
+      lastShownAlarmTime = latest.ts;
+      showAlarmPopup(alarms);
+    }
+
+    updateAlarmBell(alarms);
+  } catch (err) {
+    console.warn('Cek alarm error:', err);
+  }
+}
+
+function updateAlarmBell(alarms) {
+  const bell = document.getElementById('alarmBell');
+  const hasRecentCritical = alarms.some(a => (Date.now() - a.ts) < 30 * 60 * 1000 && a.hasCritical === true);
+  bell.classList.toggle('has-alarm', hasRecentCritical);
+}
+
+function showAlarmPopup(alarms) {
+  const modal = document.getElementById('alarmModal');
+  const body = document.getElementById('alarmBody');
+  const timeEl = document.getElementById('alarmTime');
+  const titleEl = document.getElementById('alarmTitle');
+  const subtitleEl = document.getElementById('alarmSubtitle');
+
+  const criticalEntries = alarms.filter(a => a.hasCritical === true);
+
+  if (criticalEntries.length === 0) {
+    titleEl.textContent = 'STATUS NORMAL';
+    titleEl.style.color = 'var(--primary)';
+    subtitleEl.textContent = 'Tidak ada alarm critical aktif';
+    body.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">✅ Tidak ada alarm critical</div>';
+    timeEl.textContent = '';
+    modal.classList.add('show');
+    return;
+  }
+
+  const recent = criticalEntries.slice(-10).reverse();
+  let html = '';
+  recent.forEach(entry => {
+    const critOnly = (entry.alarms || []).filter(x => x.critical === true);
+    critOnly.forEach(alarm => {
+      let cls = 'alarm-item';
+      if (alarm.type === 'cb_trip') cls += ' cb-trip';
+      else if (alarm.type === 'undervoltage') cls += ' undervoltage';
+      else if (alarm.type === 'overvoltage') cls += ' overvoltage';
+      else if (alarm.type === 'overcurrent') cls += ' overcurrent';
+      else if (alarm.type === 'undercurrent') cls += ' undercurrent';
+
+      html += `<div class="${cls}">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">🕐 ${entry.t}</div>
+        ${alarm.message}
+      </div>`;
+    });
+  });
+
+  if (!html) {
+    titleEl.textContent = 'STATUS NORMAL';
+    titleEl.style.color = 'var(--primary)';
+    body.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">✅ Tidak ada alarm critical</div>';
+    timeEl.textContent = '';
+    modal.classList.add('show');
+    return;
+  }
+
+  body.innerHTML = html;
+  timeEl.textContent = 'Alarm terbaru: ' + recent[0].t;
+  titleEl.textContent = 'ALARM TERDETEKSI';
+  titleEl.style.color = 'var(--danger)';
+  subtitleEl.textContent = 'Periksa panel listrik segera';
+
+  modal.classList.add('show');
+
+  if (!alarmSoundMuted) playAlarmSound();
+
+  if (Notification.permission === 'granted') {
+    new Notification('🚨 EIM CRITICAL ALARM', {
+      body: recent[0].msg.substring(0, 120),
+      tag: 'eim-alarm'
+    });
+  }
+}
+
+function showAlarmModal() {
+  const titleEl = document.getElementById('alarmTitle');
+  titleEl.textContent = 'ALARM TERDETEKSI';
+  titleEl.style.color = 'var(--danger)';
+
+  if (currentAlarms.length > 0) {
+    showAlarmPopup(currentAlarms);
+  } else {
+    const modal = document.getElementById('alarmModal');
+    document.getElementById('alarmBody').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">✅ Tidak ada alarm aktif</div>';
+    document.getElementById('alarmTime').textContent = '';
+    document.getElementById('alarmSubtitle').textContent = '';
+    titleEl.textContent = 'STATUS NORMAL';
+    titleEl.style.color = 'var(--primary)';
+    modal.classList.add('show');
+  }
+}
+
+function closeAlarmModal() {
+  document.getElementById('alarmModal').classList.remove('show');
+  stopAlarmSound();
+  document.getElementById('alarmTitle').textContent = 'ALARM TERDETEKSI';
+  document.getElementById('alarmTitle').style.color = 'var(--danger)';
+  document.getElementById('alarmSubtitle').textContent = 'Periksa panel listrik segera';
+}
+
+function playAlarmSound() {
+  try {
+    const sound = document.getElementById('alarmSound');
+    sound.currentTime = 0;
+    sound.play().catch(e => console.warn('Audio play blocked:', e));
+  } catch (e) {}
+}
+
+function stopAlarmSound() {
+  try {
+    const sound = document.getElementById('alarmSound');
+    sound.pause();
+    sound.currentTime = 0;
+  } catch (e) {}
+}
+
+function muteAlarmSound() {
+  alarmSoundMuted = true;
+  stopAlarmSound();
+  document.getElementById('muteBtn').textContent = '🔇 Dibisukan';
+  showToast('Suara alarm dibisukan');
 }
 
 /* ============ THEME ============ */
