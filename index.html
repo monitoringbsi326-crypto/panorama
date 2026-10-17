@@ -586,9 +586,9 @@ function initApp() {
   loadParamChips();
   cekAlarm();
 
-  setTimeout(() => {
+  /*setTimeout(() => {
     if (selectedParams.size === 0) toggleParam('Voltage A-B');
-  }, 1500);
+  }, 1500);*/
 
   refreshTimer = setInterval(() => {
     if (document.hidden) return;
@@ -640,7 +640,7 @@ async function apiCall(action, params = {}, useCache = true) {
   if (!res.ok) throw new Error('HTTP ' + res.status);
 
   const result = await res.json();
-  if (useCache && result.status === 'success') cache.set(cacheKey, result, 10000);
+  if (useCache && result.status === 'success') cache.set(cacheKey, result, 60000);
   return result;
 }
 
@@ -773,7 +773,7 @@ function toggleParam(param) {
   if (selectedParams.has(param)) {
     selectedParams.delete(param);
   } else {
-    if (selectedParams.size >= 5) {
+    if (selectedParams.size >= 3) {
       showToast('Maksimal 5 parameter sekaligus');
       return;
     }
