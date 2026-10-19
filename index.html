@@ -575,7 +575,9 @@ async function loadAIPredictions() {
     const d = result.data;
     let html = '<div class="ai-grid">';
 
-    // 1. ANOMALI
+    // ==========================================
+    // 1. DETEKSI ANOMALI
+    // ==========================================
     if (d.anomali) {
       let warnings = Object.keys(d.anomali).filter(k => d.anomali[k].level !== 'normal');
       let isDanger = warnings.length > 0;
@@ -588,10 +590,15 @@ async function loadAIPredictions() {
             <div class="ai-message" style="margin:0;">${isDanger ? 'Parameter: ' + warnings.join(', ') : 'Semua parameter normal'}</div>
           </div>
         </div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:10px; border-top:1px dashed var(--border); padding-top:8px;">
+          <b>Cara baca:</b> Membandingkan data saat ini dengan rata-rata 24 jam terakhir. Jika menyimpang jauh (Z-Score > 2), dianggap anomali.
+        </div>
       </div>`;
     }
 
-    // 2. PREDIKSI BEBAN (Dengan Sparkline)
+    // ==========================================
+    // 2. PREDIKSI BEBAN
+    // ==========================================
     if (d.beban) {
       let color = d.beban.warning ? 'var(--danger)' : 'var(--primary)';
       let svgPath = d.beban.trend === 'naik' 
@@ -613,10 +620,15 @@ async function loadAIPredictions() {
         <svg class="sparkline" viewBox="0 0 100 40" preserveAspectRatio="none">
           <path d="${svgPath}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
         </svg>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:8px; border-top:1px dashed var(--border); padding-top:8px;">
+          <b>Cara baca:</b> Garis naik berarti beban listrik diprediksi meningkat. Jika angka prediksi berwarna merah, beban berpotensi melebihi batas aman (Overload).
+        </div>
       </div>`;
     }
 
-    // 3. RISIKO TRIP CB (Dengan Gauge Meter)
+    // ==========================================
+    // 3. RISIKO TRIP CB
+    // ==========================================
     if (d.trip) {
       let levelClass = d.trip.level === 'high' ? 'danger' : d.trip.level === 'medium' ? 'warning' : 'info';
       let rotation = (d.trip.riskScore / 100) * 180 - 90; 
@@ -632,16 +644,21 @@ async function loadAIPredictions() {
         <div class="ai-message" style="text-align: center; font-weight: bold; color: var(--${levelClass === 'info' ? 'primary' : levelClass});">
           ${d.trip.recommendation}
         </div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:10px; border-top:1px dashed var(--border); padding-top:8px; text-align:left;">
+          <b>Cara baca:</b> Skor 0-100. Semakin jarum bergerak ke kanan (Merah), semakin tinggi risiko CB trip akibat akumulasi arus tinggi, PF rendah, atau THD tinggi.
+        </div>
       </div>`;
     }
 
+    // ==========================================
     // 4. POTENSI DROP TEGANGAN (SEMUA FASA)
+    // ==========================================
     if (d.drop && d.drop.status === 'success') {
       let dropLevel = d.drop.level;
       let dropClass = dropLevel === 'danger' ? 'danger' : dropLevel === 'critical' ? 'danger' : dropLevel === 'warning' ? 'warning' : 'info';
       
       let dropHtml = `<div class="ai-card ${dropClass}">
-        <h4>⚡ Potensi Drop Tegangan (Semua Fasa)</h4>`;
+        <h4>⚡ Potensi Drop Tegangan</h4>`;
       
       Object.keys(d.drop.data).forEach(param => {
         let p = d.drop.data[param];
@@ -664,11 +681,18 @@ async function loadAIPredictions() {
             </div>
           </div>`;
       });
-      dropHtml += `</div>`;
+
+      dropHtml += `
+        <div style="font-size:10px; color:var(--text-muted); margin-top:8px; border-top:1px dashed var(--border); padding-top:8px;">
+          <b>Cara baca:</b> Semakin panjang batang merah, semakin cepat tegangan akan turun di bawah 19.000V. Jika berkedip, segera kurangi beban.
+        </div>
+      </div>`;
       html += dropHtml;
     }
 
+    // ==========================================
     // 5. PREDIKSI ENERGI
+    // ==========================================
     if (d.energi) {
       html += `<div class="ai-card info">
         <h4>🔋 Prediksi Konsumsi Energi</h4>
@@ -681,6 +705,9 @@ async function loadAIPredictions() {
             <div class="ai-label">1 Bulan</div>
             <div class="ai-value" style="font-size: 16px; margin:0;">${d.energi.prediksi1Bulan} <span style="font-size:10px;">kWh</span></div>
           </div>
+        </div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:10px; border-top:1px dashed var(--border); padding-top:8px;">
+          <b>Cara baca:</b> Estimasi total pemakaian listrik (kWh) ke depan berdasarkan kecepatan konsumsi energi saat ini. Berguna untuk kontrol biaya.
         </div>
       </div>`;
     }
