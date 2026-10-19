@@ -480,7 +480,7 @@ td.alert { color: var(--danger); font-weight: 700; }
       <ul style="margin: 0; padding-left: 16px;">
         <li style="margin-bottom: 4px;"><b>Deteksi Anomali:</b> Menggunakan <i>Z-Score</i> untuk mendeteksi lonjakan data yang menyimpang >2 standar deviasi dari rata-rata.</li>
         <li style="margin-bottom: 4px;"><b>Prediksi Beban & Drop Tegangan:</b> Menggunakan <i>Linear Regression</i> untuk memproyeksikan tren masa depan dari 2000 data terakhir.</li>
-        <li style="margin-bottom: 4px;"><b>Risiko Trip CB:</b> Menggunakan sistem <i>Risk Scoring</i> (pembobotan) berdasarkan kombinasi arus, PF, dan THD.</li>
+        <!--<li style="margin-bottom: 4px;"><b>Risiko Trip CB:</b> Menggunakan sistem <i>Risk Scoring</i> (pembobotan) berdasarkan kombinasi arus, PF, dan THD.</li><-->
       </ul>
       <p style="margin-top: 8px; font-weight: 600; color: var(--danger);">
         Jangan jadikan tab ini sebagai satu-satunya patokan. Selalu utamakan pembacaan alat ukur fisik dan prosedur standar keselamatan.
@@ -626,7 +626,7 @@ async function loadAIPredictions() {
       </div>`;
     }
 
-    // ==========================================
+    /*// ==========================================
     // 3. RISIKO TRIP CB
     // ==========================================
     if (d.trip) {
@@ -648,7 +648,7 @@ async function loadAIPredictions() {
           <b>Cara baca:</b> Skor 0-100. Semakin jarum bergerak ke kanan (Merah), semakin tinggi risiko CB trip akibat akumulasi arus tinggi, PF rendah, atau THD tinggi.
         </div>
       </div>`;
-    }
+    }*/
 
     // ==========================================
     // 4. POTENSI DROP TEGANGAN (SEMUA FASA)
