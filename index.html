@@ -11,6 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
 
+  
 /* ============ SAFE AREA ============ */
 body {
   padding-top: env(safe-area-inset-top, 0);
@@ -152,6 +153,59 @@ main { padding: 12px; max-width: 1600px; margin: 0 auto; padding-bottom: calc(va
 .chart-wrap canvas { max-width: 100% !important; height: auto !important; }
 .chart-info { font-size: 10px; color: var(--text-muted); margin-top: 10px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 
+/* AI CARDS */
+.ai-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.ai-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: var(--shadow);
+  border-left: 5px solid var(--primary);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.ai-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.ai-card.warning { border-left-color: var(--warning); }
+.ai-card.danger { border-left-color: var(--danger); animation: pulse-danger 2s infinite; }
+.ai-card.info { border-left-color: var(--info); }
+@keyframes pulse-danger {
+  0% { box-shadow: 0 0 0 0 rgba(229, 62, 62, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(229, 62, 62, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(229, 62, 62, 0); }
+}
+.ai-card h4 { font-size: 13px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.ai-card .ai-value { font-size: 22px; font-weight: 800; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+.ai-card .ai-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 700; }
+.ai-card .ai-message { font-size: 12px; color: var(--text-muted); margin-top: 8px; line-height: 1.4; }
+
+/* Gauge Meter */
+.gauge-container { display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 10px 0; }
+.gauge { width: 120px; height: 60px; position: relative; overflow: hidden; }
+.gauge::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: 120px 120px 0 0;
+  background: conic-gradient(from 270deg at 50% 100%, var(--primary) 0deg, var(--warning) 90deg, var(--danger) 180deg);
+  mask: radial-gradient(circle at 50% 100%, transparent 48px, black 50px);
+  -webkit-mask: radial-gradient(circle at 50% 100%, transparent 48px, black 50px);
+}
+.gauge-value { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: 800; color: var(--text); }
+
+/* Progress Bar */
+.drop-bar-container { margin-top: 6px; background: var(--border); border-radius: 4px; height: 6px; overflow: hidden; width: 100%; }
+.drop-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+.drop-bar-fill.safe { background: var(--primary); width: 10%; }
+.drop-bar-fill.warning { background: var(--warning); width: 50%; }
+.drop-bar-fill.critical { background: var(--danger); width: 90%; animation: pulse-danger 2s infinite; }
+
+/* Sparkline */
+.sparkline { width: 100%; height: 40px; margin-top: 10px; display: block; }
+  
 /* CB TIMELINE */
 .cb-legend { display: flex; gap: 14px; margin-bottom: 8px; font-size: 11px; color: var(--text-muted); }
 .cb-legend-item { display: flex; align-items: center; gap: 5px; }
@@ -324,6 +378,7 @@ td.alert { color: var(--danger); font-weight: 700; }
     <button class="nav-item" data-page="chart" onclick="switchPage('chart')">📈 Grafik</button>
     <button class="nav-item" data-page="history" onclick="switchPage('history')">📅 Histori</button>
     <button class="nav-item" data-page="summary" onclick="switchPage('summary')">📋 Ringkasan</button>
+    <button class="nav-item" data-page="ai" onclick="switchPage('ai')">🤖 Prediksi </button>
   </div>
 
   <main>
@@ -405,6 +460,19 @@ td.alert { color: var(--danger); font-weight: 700; }
         </div>
       </div>
     </div>
+
+    <!-- TAB AI PREDICTIONS -->
+<div class="tab-content" id="tab-ai">
+  <div class="chart-panel">
+    <div class="chart-header">
+      <h3>🤖 AI Predictions</h3>
+      <button class="btn" onclick="loadAIPredictions()">🔄 Refresh</button>
+    </div>
+    <div id="aiContent">
+      <div class="loading"><div class="spinner"></div>Menganalisis data...</div>
+    </div>
+  </div>
+</div>
   </main>
 
   <nav class="bottom-nav">
@@ -420,6 +488,9 @@ td.alert { color: var(--danger); font-weight: 700; }
     <button class="nav-btn" data-tab="summary" onclick="switchPage('summary')">
       <span class="nav-icon">📋</span>Ringkasan
     </button>
+    <button class="nav-btn" data-tab="ai" onclick="switchPage('ai')">
+  <span class="nav-icon">🤖</span>AI
+</button>
   </nav>
 </div>
 
@@ -470,6 +541,139 @@ function togglePassword() {
   }
 }
 
+/* ============ AI PREDICTIONS ============ */
+async function loadAIPredictions() {
+  const content = document.getElementById('aiContent');
+  content.innerHTML = '<div class="loading"><div class="spinner"></div>Menganalisis data dengan AI...</div>';
+
+  try {
+    const result = await apiCall('predict_all', {}, false);
+    if (result.status !== 'success') {
+      content.innerHTML = '<div class="loading">Gagal memuat prediksi</div>';
+      return;
+    }
+    
+    const d = result.data;
+    let html = '<div class="ai-grid">';
+
+    // 1. ANOMALI
+    if (d.anomali) {
+      let warnings = Object.keys(d.anomali).filter(k => d.anomali[k].level !== 'normal');
+      let isDanger = warnings.length > 0;
+      html += `<div class="ai-card ${isDanger ? 'warning' : 'info'}">
+        <h4>🔍 Deteksi Anomali</h4>
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+          <div style="font-size: 32px;">${isDanger ? '⚠️' : '🛡️'}</div>
+          <div>
+            <div class="ai-value" style="margin:0;">${isDanger ? warnings.length + ' Anomali' : 'Sistem Aman'}</div>
+            <div class="ai-message" style="margin:0;">${isDanger ? 'Parameter: ' + warnings.join(', ') : 'Semua parameter normal'}</div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // 2. PREDIKSI BEBAN (Dengan Sparkline)
+    if (d.beban) {
+      let color = d.beban.warning ? 'var(--danger)' : 'var(--primary)';
+      let svgPath = d.beban.trend === 'naik' 
+        ? "M0,30 Q25,20 50,20 T100,5" 
+        : "M0,10 Q25,20 50,20 T100,30";
+      
+      html += `<div class="ai-card ${d.beban.warning ? 'danger' : 'info'}">
+        <h4>📈 Prediksi Beban (1 Jam)</h4>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+          <div>
+            <div class="ai-label">Sekarang</div>
+            <div class="ai-value" style="font-size: 18px; margin:0;">${d.beban.currentNow} A</div>
+          </div>
+          <div style="text-align: right;">
+            <div class="ai-label">Prediksi</div>
+            <div class="ai-value" style="font-size: 22px; margin:0; color:${color};">${d.beban.prediksi} A</div>
+          </div>
+        </div>
+        <svg class="sparkline" viewBox="0 0 100 40" preserveAspectRatio="none">
+          <path d="${svgPath}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>`;
+    }
+
+    // 3. RISIKO TRIP CB (Dengan Gauge Meter)
+    if (d.trip) {
+      let levelClass = d.trip.level === 'high' ? 'danger' : d.trip.level === 'medium' ? 'warning' : 'info';
+      let rotation = (d.trip.riskScore / 100) * 180 - 90; 
+      
+      html += `<div class="ai-card ${levelClass}">
+        <h4>⚡ Risiko Trip CB</h4>
+        <div class="gauge-container">
+          <div class="gauge">
+            <div class="gauge-value">${d.trip.riskScore}</div>
+            <div style="position:absolute; bottom:0; left:50%; width:2px; height:50px; background:var(--text); transform-origin: bottom center; transform: rotate(${rotation}deg); transition: transform 1s ease;"></div>
+          </div>
+        </div>
+        <div class="ai-message" style="text-align: center; font-weight: bold; color: var(--${levelClass === 'info' ? 'primary' : levelClass});">
+          ${d.trip.recommendation}
+        </div>
+      </div>`;
+    }
+
+    // 4. POTENSI DROP TEGANGAN (SEMUA FASA)
+    if (d.drop && d.drop.status === 'success') {
+      let dropLevel = d.drop.level;
+      let dropClass = dropLevel === 'danger' ? 'danger' : dropLevel === 'critical' ? 'danger' : dropLevel === 'warning' ? 'warning' : 'info';
+      
+      let dropHtml = `<div class="ai-card ${dropClass}">
+        <h4>⚡ Potensi Drop Tegangan (Semua Fasa)</h4>`;
+      
+      Object.keys(d.drop.data).forEach(param => {
+        let p = d.drop.data[param];
+        if (p.status === 'nodata') return;
+        
+        let barClass = p.level === 'danger' || p.level === 'critical' ? 'critical' : p.level === 'warning' ? 'warning' : 'safe';
+        let textColor = p.level === 'danger' || p.level === 'critical' ? 'var(--danger)' : p.level === 'warning' ? 'var(--warning)' : 'var(--primary)';
+        
+        dropHtml += `
+          <div style="margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+              <b>${param.replace('Voltage ', '')}</b>
+              <span>${p.current} V</span>
+            </div>
+            <div class="drop-bar-container">
+              <div class="drop-bar-fill ${barClass}"></div>
+            </div>
+            <div style="font-size: 10px; color: ${textColor}; margin-top: 4px; font-weight: 600;">
+              ${p.message}
+            </div>
+          </div>`;
+      });
+      dropHtml += `</div>`;
+      html += dropHtml;
+    }
+
+    // 5. PREDIKSI ENERGI
+    if (d.energi) {
+      html += `<div class="ai-card info">
+        <h4>🔋 Prediksi Konsumsi Energi</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+          <div style="background:var(--bg); padding:8px; border-radius:8px;">
+            <div class="ai-label">1 Hari</div>
+            <div class="ai-value" style="font-size: 16px; margin:0;">${d.energi.prediksi1Hari} <span style="font-size:10px;">kWh</span></div>
+          </div>
+          <div style="background:var(--bg); padding:8px; border-radius:8px;">
+            <div class="ai-label">1 Bulan</div>
+            <div class="ai-value" style="font-size: 16px; margin:0;">${d.energi.prediksi1Bulan} <span style="font-size:10px;">kWh</span></div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    html += '</div>';
+    content.innerHTML = html;
+
+  } catch (err) {
+    content.innerHTML = `<div class="loading">Error: ${err.message}</div>`;
+  }
+}
+  
 /* ============ STATE ============ */
 let authToken = null;
 let currentUser = null;
@@ -616,6 +820,7 @@ function switchPage(pageName) {
     if (selectedParams.size > 0) loadHistoryChart();
     loadCbTimeline();
   }
+  if (pageName === 'ai') loadAIPredictions();
 }
 
 /* ============ API ============ */
